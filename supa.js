@@ -92,6 +92,10 @@
   /* ---------- downloads ---------- */
   const downloads={save:async({filename,data})=>{const a=document.createElement('a');a.href=URL.createObjectURL(data instanceof Blob?data:new Blob([data]));a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);return {status:'saved'}}};
 
+  /* Funções do servidor (Edge Functions), só no site: ex. integração com o Gestão Vaeso */
+  window.pksFuncao=async(nome,corpo)=>{await pronto;const {data,error}=await sb.functions.invoke(nome,{body:corpo});
+    if(error){let msg='Não foi possível concluir.';try{msg=(await error.context.json()).erro||msg}catch{}throw new Error(msg)}return data};
+
   const CAPS={db,user,downloads};
   window.claude={use:async k=>{await pronto;return CAPS[k]||null}};
 

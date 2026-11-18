@@ -625,6 +625,17 @@ body{background:var(--bg)}
 .tema-bt svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .tema-bt .ic-sol,:root[data-theme="dark"] .tema-bt .ic-lua{display:none}:root[data-theme="dark"] .tema-bt .ic-sol{display:block}
 .busca-sis{border-radius:999px}
+/* PCP */
+.pcp-bar{display:block;height:4px;background:var(--sunken);border-radius:2px;margin-top:3px;overflow:hidden;min-width:48px}
+.pcp-bar i{display:block;height:100%;background:var(--red)}
+/* PCP Vaeso */
+.vx-quem{display:block;font-size:11.5px}.vx-ok{color:var(--done);font-weight:600;margin-left:4px}
+.vx-bt{padding:5px 12px;font-size:13px}
+tr.vx-painel td{background:var(--sunken)}
+.vx-conf{display:grid;gap:10px;padding:6px 2px}.vx-opts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.vx-opts .bt[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.vx-in{display:grid;gap:5px}.vx-in label{font-size:13px;font-weight:600}
+#vxQtd{width:170px;font:600 15px var(--body);padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink)}
 </style>
 
 <div class="app">
@@ -662,6 +673,7 @@ body{background:var(--bg)}
   <section id="v-roteiro" class="section" hidden></section>
   <section id="v-mc" class="section" hidden></section>
   <section id="v-dre" class="section" hidden></section>
+  <section id="v-pcpvaeso" class="section" hidden></section>
   <section id="v-config" class="section" hidden></section>
   <section id="v-bloqueio" class="section" hidden></section>
 </div>
@@ -765,10 +777,12 @@ const IC={home:'<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/>',
   entradas:'<path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 19h14"/>',
   faturamento:'<path d="M4 5h2l2 10h10l2-7H7"/><circle cx="10" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/>',
   estruturas:'<path d="M12 3l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4M4 17l8 4 8-4"/>',
+  pcp:'<path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5M4 9h0"/><circle cx="17" cy="15" r="0.6"/>',
   contabilidade:'<path d="M6 3h11a2 2 0 0 1 2 2v16H8a2 2 0 0 1-2-2z"/><path d="M6 19a2 2 0 0 1 2-2h11M10 8h6M10 12h4"/>'};
 const MODS=[['home','Home',[['home','Home']]],['cadastros','Cadastros',[['-','Classificação'],['forn','Fornecedores'],['cfop','CFOP'],['-','Clientes e produtos'],['clientes','Clientes'],['produtos','Produtos']]],
   ['entradas','Entradas',[['-','Lançador de NF'],['notas','Notas para lançar'],['entrada','Entrada de Notas'],['lancadas','Lançadas'],['padrao','Padrão de lançamento'],['-','Análise'],['nfe','NF-e'],['custonf','Custo NF entrada']]],
   ['estruturas','Estruturas',[['estrutura','Estrutura do produto'],['formacao','Formação de preço'],['roteiro','Roteiro']]],
+  ['pcp','PCP',[['pcpvaeso','Ordens de produção Vaeso']]],
   ['faturamento','Faturamento',[['faturamento','Faturamento']]],
   ['contabilidade','Contabilidade',[['mc','MC'],['dre','DRE']]],
   ['config','Configurações',[['config','Usuários']]]];
