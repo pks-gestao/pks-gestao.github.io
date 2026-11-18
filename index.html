@@ -1,0 +1,1309 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><script src="config.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.0/dist/umd/supabase.js"></script><script src="supa.js"></script></head><body><title>Sistema PKS</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: faixa grafite com a marca PKS, abas com indicador vermelho e tabelas densas sobre cinza claro. */
+:root{
+  --bg:#eef0f2;--panel:#ffffff;--sunken:#e3e6e9;--line:#cfd3d8;--ink:#23272b;--muted:#5d646b;
+  --band:#4a4f55;--band-ink:#ffffff;--band-muted:#d5d8dc;--band-tile:#5a6066;--brand:#d8232a;
+  --accent:#4a4f55;--accent-ink:#ffffff;--accent-soft:#e3e6e9;
+  --open:#4c535a;--open-bg:#e3e6e9;--ready:#8a4f00;--ready-bg:#fbeacb;--done:#17693b;--done-bg:#d9f0e2;--stop:#a32222;--stop-bg:#fae1df;--info:#1d5a8a;--info-bg:#deedf8;--pay:#6a2c91;--pay-bg:#efe3f7;
+  --display:"IBM Plex Sans Condensed","Arial Narrow",Arial,sans-serif;--body:"IBM Plex Sans","Segoe UI",Arial,sans-serif;--mono:"IBM Plex Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#2b2e32;--panel:#35393e;--sunken:#3f4349;--line:#50555b;--ink:#eceef0;--muted:#b4b9bf;
+  --band:#4a4f55;--band-ink:#ffffff;--band-muted:#d5d8dc;--band-tile:#5a6066;--brand:#e8383f;
+  --accent:#d5d8dc;--accent-ink:#2b2e32;--accent-soft:#3f4349;
+  --open:#c9ced3;--open-bg:#4a4f55;--ready:#f2bd6b;--ready-bg:#4a3a1c;--done:#7fd8a2;--done-bg:#1f4630;--stop:#f29b95;--stop-bg:#552828;--info:#8cc4ee;--info-bg:#223f57;--pay:#d9b3f2;--pay-bg:#4a2f5c;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#2b2e32;--panel:#35393e;--sunken:#3f4349;--line:#50555b;--ink:#eceef0;--muted:#b4b9bf;
+  --band:#4a4f55;--band-ink:#ffffff;--band-muted:#d5d8dc;--band-tile:#5a6066;--brand:#e8383f;
+  --accent:#d5d8dc;--accent-ink:#2b2e32;--accent-soft:#3f4349;
+  --open:#c9ced3;--open-bg:#4a4f55;--ready:#f2bd6b;--ready-bg:#4a3a1c;--done:#7fd8a2;--done-bg:#1f4630;--stop:#f29b95;--stop-bg:#552828;--info:#8cc4ee;--info-bg:#223f57;--pay:#d9b3f2;--pay-bg:#4a2f5c;color-scheme:dark}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--body)}
+.wrap{max-width:1320px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px;display:grid;gap:16px}
+h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;text-wrap:balance}
+h1{font-size:28px;line-height:1.1}h2{font-size:20px}h3{font-size:16px}
+p{margin:0;max-width:75ch}
+.mono{font-family:var(--mono);font-size:12.5px}.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.muted{color:var(--muted)}.small{font-size:12.5px}
+.band{background:var(--band);color:var(--band-ink);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px}
+.band-in{max-width:1288px;margin:0 auto;display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-between;align-items:center}
+.brand{display:flex;align-items:center;gap:14px;min-width:0}
+.logo{width:84px;height:62px;flex:none;overflow:hidden;position:relative}
+.logo img{position:absolute;left:-58px;top:-24px;width:200px;max-width:none;mix-blend-mode:lighten}
+.brand p{color:var(--band-muted)}
+.counts{display:flex;flex-wrap:wrap;gap:8px}
+.count{background:var(--band-tile);padding:6px 12px;min-width:112px;display:grid;gap:0}
+.count b{font:600 22px/1.2 var(--display);font-variant-numeric:tabular-nums;color:var(--band-ink)}.count span{font-size:12px;color:var(--band-muted)}
+.count.ready{box-shadow:inset 3px 0 0 #f2bd6b}.count.done{box-shadow:inset 3px 0 0 #7fd8a2}.count.open{box-shadow:inset 3px 0 0 var(--band-muted)}
+nav.tabs{display:flex;gap:2px;box-shadow:inset 0 -2px 0 var(--line);overflow-x:auto;overflow-y:hidden}
+nav.tabs a{padding:8px 16px;color:var(--muted);text-decoration:none;font:600 15px var(--display);white-space:nowrap;border-bottom:2px solid transparent}
+nav.tabs a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--brand)}
+a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,tr:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.note{background:var(--sunken);padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.note.ready{background:var(--ready-bg);color:var(--ready)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:flex;flex-wrap:wrap;border:1px solid var(--line);background:var(--panel)}
+.seg button{border:0;background:none;color:var(--muted);padding:6px 12px;font:500 13px var(--body);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+input[type=search]{font:14px var(--body);padding:6px 10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);flex:1 1 220px;min-width:0;max-width:420px}
+button.act{font:500 13px var(--body);padding:6px 12px;border:1px solid var(--accent);background:var(--panel);color:var(--accent);cursor:pointer}
+.scroll{overflow-x:auto;background:var(--panel);border:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font:600 12px var(--body);color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--sunken);white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+tr.row{cursor:pointer}tr.row:hover td{background:var(--sunken)}
+.name{font-weight:500;max-width:300px}
+.pill{display:inline-block;font:500 12px var(--body);padding:2px 8px;white-space:nowrap}
+.p-open{background:var(--open-bg);color:var(--open)}.p-ready{background:var(--ready-bg);color:var(--ready)}.p-done{background:var(--done-bg);color:var(--done)}.p-stop{background:var(--stop-bg);color:var(--stop)}.p-warn{background:var(--ready-bg);color:var(--ready)}.p-info{background:var(--info-bg);color:var(--info)}.p-pay{background:var(--pay-bg);color:var(--pay)}
+.paybox{background:var(--panel);border:1px solid var(--line);box-shadow:inset 4px 0 0 var(--pay);padding:12px 14px 12px 18px;display:grid;gap:10px}
+select.st{font:500 12.5px var(--body);padding:3px 4px;border:1px solid var(--line);background:var(--panel);color:var(--ink);max-width:160px}
+select.st[data-v="pronta"]{background:var(--ready-bg);color:var(--ready);border-color:var(--ready)}
+td.detail{background:var(--bg);padding:14px}
+.detail-grid{display:grid;gap:14px;min-width:0}
+.facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px 18px}
+.facts div{min-width:0;overflow-wrap:anywhere}.facts dt{font-size:12px;color:var(--muted)}.facts dd{margin:0;font-weight:500}
+dl{margin:0}
+ul.alerts{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+ul.alerts li{display:flex;gap:8px;align-items:flex-start}
+ul.alerts .txt{min-width:0}
+.inner{overflow-x:auto;border:1px solid var(--line);background:var(--panel)}
+.diff{color:var(--stop);font-weight:600}
+.section{display:grid;gap:10px}
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:10px}
+.rule{background:var(--panel);border:1px solid var(--line);padding:10px 14px;display:grid;gap:4px;align-content:start}
+.src{font-size:11.5px;font-weight:600;letter-spacing:.03em;color:var(--muted);text-transform:uppercase}
+.src.you{color:var(--accent)}
+ol.decide{margin:0;padding-left:20px;display:grid;gap:6px;max-width:85ch}
+.more{justify-self:center}
+.toast{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 14px;z-index:20}
+.empty{padding:24px;text-align:center;color:var(--muted)}
+.tesbar{display:flex;gap:4px;flex-wrap:wrap}
+.count.period{border:0;font:inherit;text-align:left;cursor:pointer;box-shadow:inset 3px 0 0 var(--brand)}
+.count.period:hover{background:var(--band-muted)}.count.period:hover b,.count.period:hover span{color:var(--band)}
+.perbox{background:var(--panel);border:1px solid var(--line);box-shadow:inset 4px 0 0 var(--brand);padding:12px 14px 12px 18px;display:grid;gap:10px}
+.perlist{display:flex;flex-wrap:wrap;gap:6px}
+select.ent{font:500 12.5px var(--body);padding:3px 4px;border:1px solid var(--line);background:var(--panel);color:var(--ink);min-width:118px}
+select.ent[data-v="aberto"]{background:var(--open-bg);color:var(--open)}
+select.ent[data-v="recebida"]{background:var(--info-bg);color:var(--info);border-color:var(--info)}
+select.ent[data-v="lancada"]{background:var(--done-bg);color:var(--done);border-color:var(--done)}
+td.stcol{text-align:right;white-space:nowrap}
+.natop{display:block;max-width:190px;min-width:120px;font-size:12.5px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.decs{display:grid;gap:8px;min-width:170px}
+.dec{display:grid;gap:3px}
+.dec select,.dec input{font:500 12.5px var(--body);padding:3px 4px;border:1px solid var(--line);background:var(--panel);color:var(--ink);width:100%;max-width:210px}
+.dec select.feita,.dec input.feita{border-color:var(--done);background:var(--done-bg);color:var(--done)}
+.dec select.esc{font-size:11.5px;font-weight:400;color:var(--muted);padding:2px 3px}
+th button.sort{all:unset;cursor:pointer;display:inline-flex;gap:4px;align-items:baseline;white-space:nowrap}
+th button.sort:hover{color:var(--ink)}
+th button.sort:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+th button.sort i{font-style:normal;font-size:10px;opacity:.45}
+th[aria-sort] button.sort{color:var(--ink)}th[aria-sort] button.sort i{opacity:1}
+.timebox{background:var(--panel);border:1px solid var(--line);box-shadow:inset 4px 0 0 var(--done);padding:12px 14px 12px 18px;display:flex;flex-wrap:wrap;gap:12px 32px;align-items:center}
+.timebox .big{font:600 26px/1.15 var(--display);font-variant-numeric:tabular-nums;color:var(--done)}
+.timebox .val{font:600 18px/1.25 var(--display);font-variant-numeric:tabular-nums}
+.timebox label{display:grid;gap:2px}
+.timebox input{font:600 15px var(--body);width:72px;padding:4px 8px;border:1px solid var(--line);background:var(--sunken);color:var(--ink)}
+@media (prefers-reduced-motion:no-preference){tr.row td{transition:background .1s}}
+
+/* Mascote: o Polenta, palito de polenta frita com luvas. Aparece no canto só enquanto trabalha. */
+.pol{position:fixed;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:15;display:flex;align-items:flex-end;gap:6px;pointer-events:none}
+.pol[hidden]{display:none!important}
+.pol svg{flex:none;filter:drop-shadow(0 3px 4px rgba(0,0,0,.18))}
+.pol .boneco{width:78px;height:91px}
+.pol .cena{display:none;width:200px;height:145px}
+.pol.estudo .cena{display:block}.pol.estudo .boneco{display:none}
+.polbtn{all:unset;pointer-events:auto;cursor:pointer;display:block;line-height:0}
+.polbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#polTxt{max-height:min(55vh,300px);overflow:auto}
+.polmenu{position:fixed;z-index:30;background:var(--panel);border:1px solid var(--line);box-shadow:0 6px 18px rgba(0,0,0,.18);display:grid;min-width:180px;padding:4px 0}
+.polmenu[hidden]{display:none}
+.polmenu button{all:unset;cursor:pointer;padding:7px 14px;font:500 13px var(--body);color:var(--ink)}
+.polmenu button:hover,.polmenu button:focus-visible{background:var(--sunken)}
+.pol .bal{pointer-events:auto;position:relative;background:var(--panel);color:var(--ink);border:1px solid var(--line);box-shadow:0 4px 14px rgba(0,0,0,.12);padding:8px 26px 8px 12px;max-width:230px;font-size:12.5px;line-height:1.35;margin-bottom:46px}
+.pol .bal::after{content:"";position:absolute;right:-7px;bottom:12px;width:12px;height:12px;background:var(--panel);border-right:1px solid var(--line);border-bottom:1px solid var(--line);transform:rotate(-45deg)}
+.pol .bal b{display:block;font:600 13px var(--display)}
+.pol .bal button{all:unset;cursor:pointer;position:absolute;top:3px;right:6px;color:var(--muted);font-size:15px;line-height:1;padding:2px}
+.pol .bal button:focus-visible{outline:2px solid var(--accent)}
+.pol.min .bal{display:none}
+
+.chamar{margin-left:auto;align-self:center;display:inline-flex;align-items:center;gap:6px;font:600 13px var(--body);padding:4px 12px 4px 6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;white-space:nowrap}
+.chamar:hover{border-color:var(--accent)}
+.chamar[aria-pressed="true"]{border-color:#D98E22;box-shadow:inset 0 0 0 1px #D98E22}
+.chamar svg{width:20px;height:24px;flex:none}
+.pol .bal .acoes{display:flex;gap:6px;margin-top:6px}
+.pol .bal .acoes button{all:unset;position:static;cursor:pointer;font:500 12px var(--body);padding:3px 9px;border:1px solid var(--accent);color:var(--accent)}
+body.pol-on .toast{bottom:calc(112px + env(safe-area-inset-bottom,0px))}
+@media (max-width:600px){.pol .boneco{width:58px;height:68px}.pol .cena{width:150px;height:109px}.pol .bal{max-width:170px;margin-bottom:34px}}
+/* Animações do Polenta: rodam mesmo com "reduzir animações" ligado, a pedido do usuário. */
+  .pol{animation:polIn .45s ease-out}
+  .pol .corpo{animation:polBob 3.2s ease-in-out infinite;transform-origin:60px 120px}
+  .pol .olhos{animation:polPisca 4.6s infinite;transform-origin:60px 56px}
+  .pol .acena{animation:polAcena 2.4s ease-in-out infinite;transform-origin:92px 74px}
+  .pol.chega{animation:none}
+  .pol.chega .polbtn{animation:polPula 1.15s ease-out}
+  .pol.chega .bal{animation:polBal .3s 1s both}
+  .pol.danca .boneco{animation:polDanca 1.8s ease-in-out;transform-origin:50% 100%}
+  .pol.danca .acena{animation:polAcena .5s ease-in-out infinite}
+  .pol .pagina{animation:polFolha 2.6s ease-in-out infinite;transform-origin:120px 104px}
+  .pol .pupilas{animation:polLe 2.6s ease-in-out infinite}
+  .pol .luz{animation:polLuz 3s ease-in-out infinite}
+@keyframes polPula{0%{transform:translate(170px,0)}14%{transform:translate(135px,-36px)}28%{transform:translate(100px,0)}42%{transform:translate(66px,-28px)}56%{transform:translate(36px,0)}70%{transform:translate(14px,-15px)}84%{transform:translate(0,0) scale(1.06,.9)}100%{transform:none}}
+@keyframes polBal{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes polDanca{0%,100%{transform:none}12%{transform:translateY(-12px) rotate(-12deg)}25%{transform:rotate(10deg)}37%{transform:translateY(-14px) rotate(-8deg)}50%{transform:translateX(-8px) rotate(14deg)}62%{transform:translateY(-10px) rotate(-12deg)}75%{transform:translateX(6px) rotate(8deg)}88%{transform:translateY(-6px) rotate(-4deg)}}
+@keyframes polFolha{0%,35%{transform:scaleX(1);opacity:1}70%{transform:scaleX(-1);opacity:1}92%{transform:scaleX(-1);opacity:0}100%{transform:scaleX(1);opacity:0}}
+@keyframes polLe{0%,100%{transform:translateX(-1.5px)}50%{transform:translateX(1.5px)}}
+@keyframes polLuz{0%,100%{opacity:.55}50%{opacity:.75}}
+@keyframes polIn{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+@keyframes polBob{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-3px) rotate(-1deg)}}
+@keyframes polPisca{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+@keyframes polAcena{0%,55%,100%{transform:rotate(0)}65%{transform:rotate(-16deg)}75%{transform:rotate(6deg)}85%{transform:rotate(-12deg)}}
+
+/* Menu lateral por módulo: barra escura em cinza, com logo, e painel claro de subitens */
+.app{display:grid;grid-template-columns:220px minmax(0,1fr);align-items:start;min-height:100vh}
+.side{position:sticky;top:0;height:100vh;overflow:auto;background:#3a3f45;color:#e3e6e9;display:flex;flex-direction:column;gap:10px;padding:10px 10px 16px}
+.side-logo{display:flex;align-items:center;gap:8px;padding:2px 2px 10px;border-bottom:1px solid #4d5359}
+.side-logo .logo{width:64px;height:48px}
+.side-logo .logo img{left:-44px;top:-18px;width:152px}
+.side-nome{display:grid;line-height:1.2}.side-nome b{font:600 15px var(--display);color:#fff}.side-nome span{font-size:12px;color:#b4b9bf}
+.mods{display:grid;gap:4px}
+.mod{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;color:#e3e6e9;font:500 14px var(--body)}
+.mod svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.mod span{flex:1}
+.mod .chev{width:14px;height:14px;opacity:.65}
+.mod:hover{background:#4a5057}
+.mod.aberto{background:#4a5057}
+.mod.ativo{background:#d5d8dc;color:#2b2e32;font-weight:600}
+.mod:focus-visible{outline:2px solid #fff;outline-offset:1px}
+.subnav{position:fixed;left:220px;top:0;z-index:40;width:220px;height:100vh;overflow:auto;background:var(--panel);border-right:1px solid var(--line);box-shadow:8px 0 24px rgba(0,0,0,.14);padding:22px 10px;display:flex;flex-direction:column;gap:2px}
+.subnav[hidden]{display:none}
+.sub-t{font:600 11.5px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 10px 12px}
+.subnav a{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:6px;color:var(--ink);text-decoration:none;font-size:14px}
+.subnav a i{width:7px;height:7px;border:1.5px solid var(--muted);border-radius:50%;flex:none}
+.subnav a:hover{background:var(--sunken)}
+.subnav a[aria-current="page"]{background:var(--sunken);font-weight:600}
+.subnav a[aria-current="page"] i{background:var(--ink);border-color:var(--ink)}
+.topo{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;border-bottom:2px solid var(--line);padding-bottom:8px}
+.topo .chamar{margin-left:0}
+.notasband{background:var(--band);color:var(--band-ink);padding:10px 12px;border-radius:8px}
+.notasband[hidden]{display:none}
+@media (max-width:900px){.app{grid-template-columns:1fr}.side{position:static;height:auto;flex-direction:row;align-items:center;overflow-x:auto;padding:8px}.side-logo{border:0;padding:0}.mods{grid-auto-flow:column}.mod .chev{display:none}.subnav{position:static;width:auto;box-shadow:none;height:auto;flex-direction:row;overflow-x:auto;padding:6px 8px;border-right:0;border-bottom:1px solid var(--line)}.sub-t{display:none}.subnav a{white-space:nowrap}}
+.filtros{align-items:flex-end;gap:10px}
+.campo{display:grid;gap:2px;font-size:12px;color:var(--muted)}
+.campo.cresce{flex:1 1 220px;max-width:420px}
+.campo input,.campo select{font:13px var(--body);padding:5px 8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);min-width:0}
+.campo select{max-width:280px}
+tr.tot td{background:var(--sunken);font-weight:500}
+.pagin{justify-content:center}
+.cli-grid{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:900px){.cli-grid{grid-template-columns:1fr}}
+.cli-lista{display:grid;gap:4px;max-height:75vh;overflow:auto}
+.cli-item{all:unset;cursor:pointer;display:grid;gap:2px;padding:8px 10px;border:1px solid var(--line);background:var(--panel);font-size:13px}
+.cli-item.on{border-color:var(--brand);box-shadow:inset 3px 0 0 var(--brand)}
+.cli-item:focus-visible{outline:2px solid var(--accent)}
+.cli-det{display:grid;gap:10px;min-width:0}
+input.custo{font:13px var(--mono);width:120px;text-align:right;padding:3px 6px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+input.custo.falta{background:var(--stop-bg);border-color:var(--stop);color:var(--stop)}
+input.custo.manual{border-color:var(--info)}
+tr.linha-falta td{background:color-mix(in srgb,var(--stop-bg) 55%,transparent)}
+.txt-stop{color:var(--stop)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.kpi{background:var(--panel);border:1px solid var(--line);padding:8px 12px;display:grid;gap:2px}
+.kpi b{font:600 17px var(--display);font-variant-numeric:tabular-nums}
+table.dre td:first-child{white-space:nowrap}
+
+/* Visual mais limpo: tela inteira, cantos arredondados, linhas compactas */
+:root{--bg:#f3f4f6;--sunken:#f1f3f5;--line:#e3e6ea}
+.wrap{max-width:none;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+.scroll,.inner{border-radius:12px;border:1px solid var(--line);box-shadow:0 1px 2px rgba(16,24,40,.05);overflow:auto}
+.inner{border-radius:10px}
+th{background:var(--sunken);font:600 11px var(--body);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:10px 10px;border-bottom:1px solid var(--line)}
+td{padding:7px 10px;vertical-align:middle;border-bottom:1px solid var(--line)}
+tbody tr:hover>td{background:color-mix(in srgb,var(--sunken) 70%,transparent)}
+table.compacto td{white-space:nowrap;padding-top:6px;padding-bottom:6px}
+td.larga,th.larga{min-width:320px}
+table.compacto td.larga{white-space:nowrap}
+.note,.paybox,.timebox,.perbox,.kpi,.notasband,.rule{border-radius:12px}
+.seg{border-radius:10px;overflow:hidden}
+.campo input,.campo select,input[type=search],select.st,select.ent,button.act,.chamar,.dec select,.dec input{border-radius:8px}
+.pill{border-radius:999px}
+.topo{border-bottom:0;padding-bottom:0}
+.topo h2{font-size:22px}
+/* Fechamento: MC e DRE */
+.fech-topo{display:flex;justify-content:flex-end}
+.per-sel{display:flex;align-items:center;gap:10px;font:600 11.5px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.per-sel select{font:500 14px var(--body);letter-spacing:0;text-transform:none;color:var(--ink);padding:8px 34px 8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);min-width:200px}
+.cards3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.card-k{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--ink);border-radius:12px;padding:14px 18px;display:grid;gap:4px;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+.card-k.verde{border-left-color:#4f9a7f}
+.card-k span{font:600 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.card-k b{font:700 24px var(--body);font-variant-numeric:tabular-nums}
+.barra{gap:10px}.barra .cresce{flex:1}
+.busca{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:0 12px;flex:0 1 340px}
+.busca svg,.bt svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;flex:none;color:var(--muted)}
+.busca input{border:0;background:transparent;padding:9px 0;font:14px var(--body);color:var(--ink);width:100%;outline:none;max-width:none}
+.bt{display:inline-flex;align-items:center;gap:8px;font:600 14px var(--body);padding:9px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);cursor:pointer}
+.bt svg{color:var(--ink)}
+.colsel{position:relative}
+.colsel summary{list-style:none;cursor:pointer;font:500 14px var(--body);padding:9px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);display:flex;gap:10px;align-items:center;min-width:200px;justify-content:space-between}
+.colsel summary::-webkit-details-marker{display:none}
+.colsel-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:8px;display:grid;gap:2px;min-width:220px}
+.colsel-menu label{display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:6px;font-size:13.5px;cursor:pointer}
+.colsel-menu label:hover{background:var(--sunken)}
+table.fech th{text-align:right}table.fech th:first-child{text-align:left}
+table.fech td.destaque,table.fech th:nth-last-child(-n+2){background:color-mix(in srgb,var(--sunken) 80%,transparent)}
+.mono.b{font-weight:600;color:var(--ink)}
+.dre-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 18px;max-width:640px;box-shadow:0 1px 3px rgba(16,24,40,.06)}
+table.dre2 th{background:transparent;padding:10px 8px}
+table.dre2 td{padding:11px 8px;font-size:14px}
+table.dre2 tr.forte td{font-weight:700}
+table.dre2 tr.total td{background:#e6eeea;font:700 15px var(--body)}
+table.dre2 td.sub{padding-left:30px;color:var(--muted)}
+table.dre2 tr.sep td{font:600 11px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:18px}
+.ic{display:inline-grid;place-items:center;width:24px;height:24px;border:1px solid var(--line);border-radius:6px;margin-right:10px;vertical-align:middle}
+.ic svg{width:13px;height:13px;fill:none;stroke:var(--muted);stroke-width:1.6}
+.pct-in{display:inline-flex;align-items:center;gap:4px;margin-left:8px;font-size:12px;color:var(--muted)}
+.pct-in input{width:54px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) table.dre2 tr.total td{background:#2f4a3e}}
+:root[data-theme="dark"] table.dre2 tr.total td{background:#2f4a3e}
+
+/* Chamar o Polenta como último item do menu lateral; telas na largura toda */
+.side-pol{border-top:1px solid #4d5359;padding-top:10px}
+.side .chamar{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:8px;color:#e3e6e9;font:500 14px var(--body)}
+.side .chamar svg{width:18px;height:22px;flex:none}
+.side .chamar:hover{background:#4a5057}
+.side .chamar[aria-pressed="true"]{background:#d5d8dc;color:#2b2e32;font-weight:600}
+.side .chamar:focus-visible{outline:2px solid #fff;outline-offset:1px}
+.wrap{margin:0;width:100%;min-width:0}
+td.trunca{max-width:340px;overflow:hidden;text-overflow:ellipsis}
+#v-produtos td.trunca{max-width:150px}#v-produtos td.mono{max-width:95px;overflow:hidden;text-overflow:ellipsis}#v-clientes td.trunca{max-width:280px}#v-produtos td.mono{font-size:12px}
+table.fit{table-layout:auto}
+table.fit td,table.fit th{padding-left:6px;padding-right:6px}table.fit th{letter-spacing:.02em}
+@media (max-width:900px){.side-pol{border:0;padding:0}}
+.cli-sel select{max-width:340px;min-width:240px}
+.sub-h{font:600 10.5px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:12px 10px 4px;opacity:.8}
+.sub-t+.sub-h{padding-top:0}
+td.estreita,th.estreita{max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+select.clsel{font:500 12.5px var(--body);padding:3px 6px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+select.clsel.sim{background:var(--done-bg);color:var(--done);border-color:var(--done)}
+select.clsel.nao{background:var(--open-bg);color:var(--open)}
+button.lnk{background:none;border:0;padding:0 2px;color:var(--muted);text-decoration:underline;cursor:pointer;font:inherit;font-size:11.5px}
+/* Análise de entradas. Cores das classificações: paleta categórica validada, na ordem da lista. */
+/* Análise de entradas: tons de fire brick alternados com cinzas quentes (sóbrio; rótulos e legenda identificam). */
+:root{--c1:#b22222;--c2:#6b6460;--c3:#e08a84;--c4:#8a1f1f;--c5:#b8b0aa;--c6:#c9504b;--c7:#948b86;--c8:#ebb8b3;--c0:#a39d99;--c-sem:#ddd8d3;--firebrick:#b22222;--fat-linha:#4a4542}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c1:#d24a45;--c2:#8a827d;--c3:#f0a19b;--c4:#9e2c28;--c5:#cfc7c2;--c6:#c2423d;--c7:#6e6763;--c8:#f5c9c5;--c0:#857d79;--c-sem:#4a4643;--firebrick:#d24a45;--fat-linha:#d8d2cd}}
+:root[data-theme="dark"]{--c1:#d24a45;--c2:#8a827d;--c3:#f0a19b;--c4:#9e2c28;--c5:#cfc7c2;--c6:#c2423d;--c7:#6e6763;--c8:#f5c9c5;--c0:#857d79;--c-sem:#4a4643;--firebrick:#d24a45;--fat-linha:#d8d2cd}
+.nfa-topo{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.nfa-tabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px}
+.nfa-tabs button{all:unset;cursor:pointer;padding:8px 14px;border-radius:9px;font:600 14px var(--body);color:var(--ink)}
+.nfa-tabs button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.nfa-tabs button:focus-visible{outline:2px solid var(--accent)}
+.nfa-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.nfa-kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 18px;display:grid;gap:4px;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+.nfa-kpi span{font-size:13px;color:var(--muted)}
+.nfa-kpi b{font:700 22px var(--body);font-variant-numeric:tabular-nums}
+.nfa-kpi small{font-size:12.5px;color:var(--muted)}
+.nfa-kpi .up,.nfa-kpi .ok{color:var(--done);font-weight:600}.nfa-kpi .down{color:var(--stop);font-weight:600}
+.warn{color:var(--ready)!important;font-weight:600}
+.nfa-graf{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px}
+@media (max-width:1000px){.nfa-graf{grid-template-columns:1fr}}
+.nfa-painel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 20px;box-shadow:0 1px 2px rgba(16,24,40,.05);min-width:0}
+.nfa-painel h3,.nfa-lista h3{font:700 16px var(--body);margin:0 0 12px}
+.nfa-barras{display:flex;align-items:flex-end;gap:14px;height:230px;border-bottom:1px solid var(--line);margin-bottom:26px}
+.nfa-bar{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;text-align:center;outline:none;position:relative}
+.nfa-bar small{font:600 11.5px var(--body);font-variant-numeric:tabular-nums;color:var(--ink);margin-bottom:4px}
+.nfa-bar i{display:block;border-radius:4px 4px 0 0;min-height:2px}
+.nfa-bar span{position:absolute;left:0;right:0;bottom:-22px;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nfa-bar:hover i,.nfa-bar:focus-visible i{outline:2px solid var(--ink);outline-offset:1px}
+.nfa-rosca{display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;align-items:center}
+.nfa-rosca svg{width:150px;height:150px}
+.nfa-rosca .r-v{font:700 15px var(--body);fill:var(--ink)}.nfa-rosca .r-l{font:11px var(--body);fill:var(--muted)}
+table.nfa-leg{width:100%}
+table.nfa-leg td{padding:6px 6px;border-bottom:1px solid var(--line);font-size:13px;white-space:nowrap}
+table.nfa-leg{table-layout:fixed}table.nfa-leg td:first-child{overflow:hidden;text-overflow:ellipsis;width:auto}table.nfa-leg td:nth-child(2){width:100px}table.nfa-leg td:nth-child(3){width:44px}
+table.nfa-leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle}
+.nfa-cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.nfa-cat{all:unset;box-sizing:border-box;cursor:pointer;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--cc);border-radius:12px;padding:10px 14px;display:grid;gap:2px}
+.nfa-cat span{font-size:12.5px;color:var(--muted)}.nfa-cat b{font:700 16px var(--body);font-variant-numeric:tabular-nums}.nfa-cat small{font-size:12px;color:var(--muted)}
+.nfa-cat[aria-pressed="true"]{box-shadow:0 0 0 2px var(--cc)}
+.nfa-cat:focus-visible{outline:2px solid var(--accent)}
+.nfa-lista{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 16px;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+.nfa-lista .scroll{box-shadow:none}
+.nfa-lista h3{margin:0;display:flex;gap:8px;align-items:center}
+.cat-pill{background:color-mix(in srgb,var(--cc) 16%,transparent);color:var(--ink);border:1px solid color-mix(in srgb,var(--cc) 45%,transparent);max-width:170px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:middle}
+.tag{font:600 11px var(--mono);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--muted)}
+.seta{display:inline-block;width:12px;color:var(--muted)}
+#v-nfe td.trunca{max-width:300px}
+#v-forn td.estreita{max-width:80px}
+#v-nfe:not([hidden]){display:grid;gap:14px}
+.fat-kpis small{font-size:12px}
+select.clsel.cat{max-width:130px}
+#v-forn td.trunca{max-width:190px}
+#v-forn .cat-pill{max-width:120px}
+.p-info{background:var(--info-bg);color:var(--info)}
+/* Identidade visual: barra lateral clara, selo PKS vermelho, item ativo em cartão branco com marca vermelha. */
+:root{--red:#c8414b;--red-ink:#b3333d;--red-bg:#fbe9ea;--side-bg:#dcdfe2;--side-ink:#2b2f33;--side-mut:#5f666d;--side-line:#c6cacf;--bg:#f4f5f6;--panel:#ffffff;--line:#e4e6e9}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--red:#e0656e;--red-ink:#f08890;--red-bg:#4a2427;--side-bg:#2e3236;--side-ink:#e6e8ea;--side-mut:#a9afb5;--side-line:#454a50}}
+:root[data-theme="dark"]{--red:#e0656e;--red-ink:#f08890;--red-bg:#4a2427;--side-bg:#2e3236;--side-ink:#e6e8ea;--side-mut:#a9afb5;--side-line:#454a50}
+body{background:var(--bg)}
+.app{grid-template-columns:246px minmax(0,1fr)}
+.side{background:var(--side-bg);color:var(--side-ink);padding:22px 16px 16px;gap:6px}
+.side-logo{border:0;padding:0 6px 20px;gap:12px}
+.logo-pks{display:grid;place-items:center;width:46px;height:46px;border-radius:12px;background:var(--red);color:#fff;font:700 17px var(--body);letter-spacing:-.02em;box-shadow:0 4px 10px color-mix(in srgb,var(--red) 35%,transparent);flex:none}
+.side-nome b{font:700 15px var(--body);color:var(--side-ink)}.side-nome span{font-size:12px;color:var(--side-mut)}
+.side-sec{font:700 11px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--side-mut);padding:6px 12px 10px}
+.mods{gap:6px}
+.mod{color:var(--side-ink);padding:13px 14px;border-radius:10px;font:600 14.5px var(--body);border-left:3px solid transparent}
+.mod svg{color:var(--side-mut)}
+.mod:hover,.mod.aberto{background:color-mix(in srgb,var(--panel) 45%,transparent)}
+.mod.ativo{background:var(--panel);color:var(--side-ink);font-weight:700;border-left-color:var(--red);box-shadow:0 2px 8px rgba(16,24,40,.08)}
+.mod.ativo svg:first-child{color:var(--red)}
+.mod:focus-visible,.side .chamar:focus-visible{outline:2px solid var(--red);outline-offset:1px}
+.side-pol{border-top:1px solid var(--side-line);margin-top:14px;padding-top:14px}
+.side .chamar{color:var(--side-ink);padding:13px 14px;border-radius:10px;font:600 14.5px var(--body)}
+.side .chamar:hover{background:color-mix(in srgb,var(--panel) 45%,transparent)}
+.side .chamar[aria-pressed="true"]{background:var(--panel);color:var(--side-ink);box-shadow:0 2px 8px rgba(16,24,40,.08)}
+.side .chamar .chev{width:14px;height:14px;margin-left:auto;fill:none;stroke:currentColor;stroke-width:1.7;opacity:.65}
+.side-fim{margin-top:auto;display:grid;gap:14px;padding-top:16px}
+.ajuda{background:color-mix(in srgb,var(--panel) 40%,transparent);border:1px solid var(--side-line);border-radius:14px;padding:16px;display:grid;gap:8px}
+.ajuda b{font:700 14px var(--body)}.ajuda p{margin:0;font-size:12.5px;color:var(--side-mut);line-height:1.45}
+.ajuda button{all:unset;box-sizing:border-box;cursor:pointer;justify-self:start;background:color-mix(in srgb,var(--side-mut) 18%,transparent);border-radius:8px;padding:8px 12px;font:600 12.5px var(--body);color:var(--side-ink)}
+.ajuda button:hover{background:color-mix(in srgb,var(--side-mut) 28%,transparent)}
+.ajuda button:focus-visible{outline:2px solid var(--red)}
+.perfil{display:flex;align-items:center;gap:10px;border-top:1px solid var(--side-line);padding:14px 4px 0}
+.perfil i{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:color-mix(in srgb,var(--side-mut) 22%,transparent);font:700 12px var(--body);font-style:normal}
+.perfil b{display:block;font:700 13px var(--body)}.perfil span{font-size:12px;color:var(--side-mut)}
+.subnav{left:246px;padding:24px 12px;border-radius:0 14px 14px 0}
+.subnav a[aria-current="page"]{background:var(--red-bg);color:var(--red-ink)}
+.subnav a[aria-current="page"] i{background:var(--red);border-color:var(--red)}
+/* Topo: trilha, busca e data; título da página com chamada vermelha */
+.barra-topo{display:flex;align-items:center;gap:14px;padding:4px 0 18px;border-bottom:1px solid var(--line)}
+.trilha{font-size:13.5px;color:var(--muted);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.trilha b{color:var(--ink);font-weight:700}.trilha .sep{margin:0 8px;opacity:.6}
+.busca-sis{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:0 12px;width:220px}
+.busca-sis svg{width:15px;height:15px;fill:none;stroke:var(--muted);stroke-width:1.8;flex:none}
+.busca-sis input{border:0;background:transparent;padding:9px 0;font:13.5px var(--body);color:var(--ink);width:100%;outline:none}
+.data-topo{font-size:13.5px;color:var(--ink);white-space:nowrap}
+.topo{border:0;padding:20px 0 4px;display:grid;gap:4px;justify-content:stretch}
+.topo .olho{font:700 11.5px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--red)}
+.topo h2{font:700 28px var(--body);letter-spacing:-.01em;color:var(--ink)}
+.topo p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.side-logo .logo{display:none}
+/* Home */
+#v-home:not([hidden]){display:grid;gap:22px}
+.home-banner{position:relative;overflow:hidden;background:linear-gradient(100deg,color-mix(in srgb,var(--side-bg) 75%,var(--panel)),var(--side-bg));border-radius:16px;border-right:4px solid var(--red);padding:34px 30px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.home-banner::after{content:"";position:absolute;right:120px;top:-60px;width:300px;height:300px;border-radius:50%;border:34px solid color-mix(in srgb,var(--panel) 30%,transparent);pointer-events:none}
+.home-banner .olho{font:700 10.5px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--red)}
+.home-banner h3{font:700 21px var(--body);margin:8px 0 6px}
+.home-banner p{margin:0;font-size:13px;color:var(--muted)}
+.bt-red{all:unset;box-sizing:border-box;cursor:pointer;position:relative;z-index:1;background:var(--red);color:#fff;font:700 13.5px var(--body);padding:12px 18px;border-radius:9px;box-shadow:0 4px 12px color-mix(in srgb,var(--red) 35%,transparent)}
+.bt-red:hover{filter:brightness(1.05)}.bt-red:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.home-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}
+.home-kpi{all:unset;box-sizing:border-box;cursor:pointer;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;display:grid;gap:10px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.home-kpi:hover{border-color:color-mix(in srgb,var(--red) 40%,var(--line))}.home-kpi:focus-visible{outline:2px solid var(--red)}
+.home-kpi .cab{display:flex;justify-content:space-between;align-items:flex-start;font-size:13px;color:var(--muted)}
+.home-kpi .ico{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--red-bg);color:var(--red)}
+.home-kpi .ico svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.home-kpi b{font:700 26px var(--body);font-variant-numeric:tabular-nums;color:var(--ink)}
+.home-kpi small{font-size:12px;color:var(--muted)}.home-kpi small .up{color:var(--done);font-weight:600}.home-kpi small .down{color:var(--stop);font-weight:600}.home-kpi small .at{color:var(--ready);font-weight:600}
+.home-duo{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px}
+@media (max-width:1000px){.home-duo{grid-template-columns:1fr}}
+.home-duo h3{font:700 16px var(--body);display:flex;justify-content:space-between;align-items:center;margin:0 0 12px}
+.home-duo h3 a{font:600 13px var(--body);color:var(--red-ink);text-decoration:none}.home-duo h3 a:hover{text-decoration:underline}
+.home-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:6px 18px 10px}
+.home-card table th{background:transparent;font-size:10.5px}
+.home-card table td{font-size:13px}
+.st-pill{font:700 11px var(--body);border-radius:999px;padding:3px 9px;background:var(--sunken);color:var(--muted)}
+.st-pill.red{background:var(--red-bg);color:var(--red-ink)}
+.ativ{list-style:none;margin:0;padding:0}
+.ativ li{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:10px;padding:13px 0;border-bottom:1px solid var(--line)}
+.ativ li:last-child{border:0}
+.ativ li::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--red);margin-top:5px;box-shadow:0 0 0 3px var(--red-bg)}
+.ativ b{display:block;font:700 13px var(--body)}.ativ span{font-size:12px;color:var(--muted)}.ativ time{font-size:11.5px;color:var(--muted);white-space:nowrap}
+.home-rod{display:flex;justify-content:flex-end;gap:14px;font-size:11.5px;color:var(--muted)}
+@media (max-width:900px){.side-sec,.side-fim{display:none}.busca-sis{display:none}}
+/* Opção A: lateral branca com linha fina; item ativo em fundo rosado e texto vermelho. */
+:root{--side-bg:#ffffff;--side-ink:#2b2f33;--side-mut:#6b7178;--side-line:#e6e8eb;--side-hover:#f3f4f6}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--side-bg:#25292d;--side-ink:#e6e8ea;--side-mut:#a9afb5;--side-line:#3a3f45;--side-hover:#2f3438}}
+:root[data-theme="dark"]{--side-bg:#25292d;--side-ink:#e6e8ea;--side-mut:#a9afb5;--side-line:#3a3f45;--side-hover:#2f3438}
+.side{border-right:1px solid var(--side-line)}
+.mod{border-left:0;padding:11px 14px;font-weight:500}
+.mod:hover,.mod.aberto,.side .chamar:hover{background:var(--side-hover)}
+.mod.ativo{background:var(--red-bg);color:var(--red-ink);font-weight:600;box-shadow:none}
+.mod.ativo svg{color:var(--red)}
+.side .chamar{padding:11px 14px;font-weight:500}
+.side .chamar[aria-pressed="true"]{background:var(--red-bg);color:var(--red-ink);box-shadow:none}
+.ajuda{background:var(--bg);border-color:var(--side-line)}
+.ajuda button{background:var(--side-bg);border:1px solid var(--side-line)}
+.ajuda button:hover{background:var(--side-hover)}
+.perfil i{background:var(--red-bg);color:var(--red-ink)}
+.subnav{border-left:1px solid var(--side-line);box-shadow:8px 0 24px rgba(16,24,40,.08)}
+.home-banner{background:var(--panel);border:1px solid var(--line);border-right:4px solid var(--red)}
+.home-banner::after{border-color:color-mix(in srgb,var(--red) 7%,transparent)}
+/* Opção 3: cinza quente. Lateral em cinza amarronzado, fundo off-white, vermelho apagado só no selo e nos rótulos. */
+:root{--red:#b4545b;--red-ink:#9a4249;--red-bg:#f5e8e8;--side-bg:#45413e;--side-ink:#f2efec;--side-mut:#c2bcb6;--side-line:#57524e;--side-hover:#4f4a47;--side-on:#5a5551;
+  --bg:#f6f5f3;--panel:#ffffff;--sunken:#efece8;--line:#e7e3de;--ink:#3a3633;--muted:#6e6862}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--red:#d27a80;--red-ink:#e39a9f;--red-bg:#4a2e2f;--side-bg:#2f2c2a;--side-ink:#f2efec;--side-mut:#b3ada7;--side-line:#45413e;--side-hover:#3a3633;--side-on:#4a4542;--bg:#262422;--panel:#2f2c2a;--sunken:#3a3633;--line:#45413e;--ink:#efebe7;--muted:#b3ada7}}
+:root[data-theme="dark"]{--red:#d27a80;--red-ink:#e39a9f;--red-bg:#4a2e2f;--side-bg:#2f2c2a;--side-ink:#f2efec;--side-mut:#b3ada7;--side-line:#45413e;--side-hover:#3a3633;--side-on:#4a4542;--bg:#262422;--panel:#2f2c2a;--sunken:#3a3633;--line:#45413e;--ink:#efebe7;--muted:#b3ada7}
+.side{border-right:0}
+.mod svg{color:var(--side-mut)}
+.mod:hover,.mod.aberto,.side .chamar:hover{background:var(--side-hover)}
+.mod.ativo,.side .chamar[aria-pressed="true"]{background:var(--side-on);color:#fff;font-weight:600}
+.mod.ativo svg,.mod.ativo svg:first-child{color:#fff}
+.logo-pks{box-shadow:none}
+.ajuda{background:var(--side-hover);border-color:var(--side-line)}
+.ajuda button{background:var(--side-on);border:0;color:var(--side-ink)}
+.ajuda button:hover{background:#66605b}
+.perfil i{background:var(--side-on);color:var(--side-ink)}
+.mod:focus-visible,.side .chamar:focus-visible,.ajuda button:focus-visible{outline:2px solid #f2efec}
+.subnav a[aria-current="page"]{background:var(--sunken);color:var(--ink)}
+.subnav a[aria-current="page"] i{background:var(--red);border-color:var(--red)}
+.bt-red{background:var(--side-bg);box-shadow:none}
+.home-kpi .ico{background:var(--sunken);color:var(--red)}
+.home-banner{border-right-color:var(--red)}
+/* Lateral em cinza cimentado (concreto), mantendo o resto do cinza quente. */
+:root{--side-bg:#6e6d6a;--side-ink:#ffffff;--side-mut:#e4e2de;--side-line:#82817d;--side-hover:#7a7975;--side-on:#565552}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--side-bg:#4a4947;--side-ink:#f4f3f1;--side-mut:#cfccc8;--side-line:#5c5b58;--side-hover:#555451;--side-on:#3a3937}}
+:root[data-theme="dark"]{--side-bg:#4a4947;--side-ink:#f4f3f1;--side-mut:#cfccc8;--side-line:#5c5b58;--side-hover:#555451;--side-on:#3a3937}
+.ajuda button:hover{background:#4a4947}
+.bt-red{background:var(--ink)}
+.topo[hidden]{display:none}
+.fat-graf{margin:4px 0 6px}.fat-graf .nfa-barras{height:190px}
+.cfop-abas{width:max-content;margin-bottom:10px}
+/* Período discreto no canto superior direito da tela */
+.section{position:relative}
+.per-pop{position:absolute;right:0;top:-58px;z-index:20}
+.per-pop summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:13px;padding:7px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink)}
+.per-pop summary::-webkit-details-marker{display:none}
+.per-pop summary svg{width:15px;height:15px;fill:none;stroke:var(--muted);stroke-width:1.7}
+.per-pop summary b{font-weight:600}.per-pop summary i{font-style:normal;color:var(--muted);font-size:11px}
+.per-pop summary:hover{border-color:var(--muted)}.per-pop summary:focus-visible{outline:2px solid var(--red)}
+.per-menu{position:absolute;right:0;top:calc(100% + 6px);width:320px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.12);padding:12px;display:grid;gap:12px}
+.per-rap{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.per-rap button{all:unset;box-sizing:border-box;cursor:pointer;text-align:center;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:13px}
+.per-rap button:hover{background:var(--sunken)}.per-rap button[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.per-rap button:focus-visible{outline:2px solid var(--red)}
+.per-l{display:grid;gap:4px;font:600 11px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.per-l select,.per-int input{font:13px var(--body);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);text-transform:none;letter-spacing:0}
+.per-menu,.per-menu *{box-sizing:border-box}.per-menu>*{min-width:0}
+.per-int{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:6px}.per-int input{min-width:0;width:100%}.per-int .bt{grid-column:1/-1;justify-content:center}.per-int span{text-transform:none;font-weight:400}
+.per-int .bt{padding:6px 10px;font-size:12.5px;text-transform:none;letter-spacing:0}
+#v-roteiro td.trunca{max-width:300px}
+/* Formação de preço */
+.fp-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start;padding:6px 0}
+@media (max-width:1100px){.fp-grid{grid-template-columns:1fr}}
+.fp-blocos{display:grid;gap:12px;min-width:0}
+.fp-bloco h4,.fp-resumo h4{font:700 13.5px var(--body);margin:0 0 6px;display:flex;justify-content:space-between;gap:8px}
+.fp-bloco h4 span{font-weight:500;color:var(--muted);font-size:12.5px}
+.fp-bloco td,.fp-bloco th{white-space:nowrap}
+.fp-resumo{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;position:sticky;top:12px}
+.fp-resumo table.dre2 td{padding:7px 6px;font-size:13px}
+#v-formacao td.trunca{max-width:320px}
+#v-produtos .cfop-abas{margin-bottom:10px}
+/* Ficha da formação de preço */
+:root{--fp-m:#eef5f0;--fp-mh:#dcebe1;--fp-p:#f2f3f2;--fp-ph:#e6e8e6;--fp-e:#fdf3e4;--fp-eh:#f9e3c3;--fp-t:#ece9f6}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--fp-m:#26332b;--fp-mh:#2e4035;--fp-p:#2c2f2d;--fp-ph:#353936;--fp-e:#3a3022;--fp-eh:#4a3b26;--fp-t:#302d3d}}
+:root[data-theme="dark"]{--fp-m:#26332b;--fp-mh:#2e4035;--fp-p:#2c2f2d;--fp-ph:#353936;--fp-e:#3a3022;--fp-eh:#4a3b26;--fp-t:#302d3d}
+.fp-lista{display:grid;gap:10px}
+.fp-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.fp-cab{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;flex-wrap:wrap}
+.fp-cab:hover{background:color-mix(in srgb,var(--sunken) 60%,transparent)}.fp-cab:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
+.fp-nome{font:700 15px var(--body);background:var(--fp-m);padding:6px 12px;border-radius:8px;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fp-nome small{font-weight:400;color:var(--muted);margin-left:8px;font-size:11.5px}
+.fp-cli{background:var(--fp-t);color:var(--ink);max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.fp-num{font-size:12.5px;color:var(--muted);white-space:nowrap}.fp-num b{font:600 13px var(--mono);color:var(--ink)}
+.fp-bt{padding:6px 10px;font-size:12.5px}
+.fp-ficha{border-top:1px solid var(--line)}
+.fp-ficha table{width:100%;border-collapse:collapse;table-layout:auto}
+.fp-ficha th{font-size:10px;padding:7px 5px;letter-spacing:.02em;white-space:nowrap;background:var(--sunken)}
+.fp-ficha td{padding:6px 5px;font-size:12.5px;border-bottom:1px solid var(--line);vertical-align:middle}
+.fp-ficha .fp-m{background:var(--fp-m)}.fp-ficha th.fp-m{background:var(--fp-mh)}
+.fp-ficha .fp-p{background:var(--fp-p)}.fp-ficha th.fp-p{background:var(--fp-ph)}
+.fp-ficha .fp-e{background:var(--fp-e);vertical-align:top}.fp-ficha th.fp-e{background:var(--fp-eh)}
+.fp-ficha tr.fp-g th{text-align:center;font-size:11px;letter-spacing:.08em}.fp-ficha tr.fp-g th span{font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0}
+.fp-item{font-weight:600;max-width:140px;font-size:12px}
+.fp-sel{font:12.5px var(--body);padding:3px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);max-width:150px}
+.fp-mpnome{display:inline-block;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+.fp-in{width:52px;font:600 13px var(--mono);text-align:right;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+.fp-embv{margin-top:6px}
+.fp-tot td{background:var(--fp-t);font-weight:700}
+.fp-vazio{padding:12px 16px;border-top:1px solid var(--line)}
+.fp-e .fp-sel{max-width:120px}
+/* Custo NF entrada */
+.cnf-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:10px}
+.cnf-f{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.cnf-f select{font:13px var(--body);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);max-width:180px}
+.cnf-busca{flex:1 1 220px}
+.cnf-seg{display:flex;gap:2px;border:1px solid var(--line);border-radius:10px;padding:3px}
+.cnf-seg button{all:unset;cursor:pointer;padding:6px 14px;border-radius:7px;font:600 13.5px var(--body)}
+.cnf-seg button[aria-pressed="true"]{background:var(--side-bg);color:#fff}.cnf-seg button:focus-visible{outline:2px solid var(--red)}
+.cnf-head,.cnf-row{display:grid;grid-template-columns:minmax(0,1fr) 150px 150px 100px 90px 24px;gap:12px;align-items:center}
+.cnf-head{padding:6px 18px;font:600 11px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}.cnf-head small{font-weight:400}
+.cnf-lista{display:grid;gap:8px}
+.cnf-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.cnf-card.aberto{border-color:var(--muted)}
+.cnf-row{padding:12px 18px;cursor:pointer}.cnf-row:hover,.cnf-card.aberto .cnf-row{background:color-mix(in srgb,var(--sunken) 70%,transparent)}
+.cnf-row:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
+.cnf-row small{color:var(--muted);font-size:11.5px;font-weight:400}
+.cnf-mat{display:grid;gap:2px;min-width:0}.cnf-mat b{font:600 14.5px var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cnf-var{display:inline-block;min-width:24px;text-align:center;font:600 11.5px var(--body);padding:3px 8px;border-radius:999px;background:var(--sunken);color:var(--muted)}
+.cnf-var.sobe{background:var(--stop-bg);color:var(--stop)}.cnf-var.cai{background:var(--done-bg);color:var(--done)}
+.cnf-tend{color:var(--ink)}.spark{width:64px;height:22px;display:block}
+.cnf-det{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px;padding:14px 18px 18px;border-top:1px solid var(--line)}
+@media (max-width:1000px){.cnf-det{grid-template-columns:1fr}}
+.cnf-ult{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:12px;overflow:hidden;align-self:start}
+.cnf-k{padding:10px 14px;border-bottom:1px solid var(--line);display:grid;gap:3px}.cnf-k:nth-child(odd):not(.cnf-k2){border-right:1px solid var(--line)}
+.cnf-k2{grid-column:1/-1}.cnf-k span{font:600 10.5px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.cnf-k b{font:600 14px var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cnf-tot{background:var(--sunken);border-bottom:0}
+.cnf-k:nth-child(2){border-right:1px solid var(--line)}
+.cnf-tit{display:block;font:600 11px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.cnf-hist tr.cnf-sel td{background:var(--sunken)}
+@media print{.side,.subnav,.barra-topo,.cnf-bar,.pagin,#pol,.per-pop{display:none!important}.app{display:block}.cnf-card{break-inside:avoid}}
+/* Produtos de entrada: itens da estrutura sem compra */
+.it-in{width:100%;min-width:90px;font:13px var(--body);padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+.it-um{width:52px;text-align:left}
+/* Barra lateral mais estreita */
+@media (min-width:901px){.app{grid-template-columns:196px minmax(0,1fr)}.subnav{left:196px}
+.side{padding:18px 10px 14px}.mod{padding:10px 10px;font-size:13.5px;gap:8px}
+.ajuda{padding:12px}.ajuda p{font-size:12px}}
+/* Faturamento: barras fire brick e linha tracejada */
+.fat-graf .nfa-barras{position:relative}.fat-graf .nfa-bar i{background:var(--firebrick)}
+.fat-linha{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+.fat-linha polyline{fill:none;stroke:var(--fat-linha);stroke-width:1.5;stroke-dasharray:5 4;stroke-linejoin:round}
+.fat-linha circle{fill:var(--panel);stroke:var(--fat-linha);stroke-width:1.5}
+/* Produtos: caixas de financeiro e estoque */
+.chk-cls{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);white-space:nowrap;align-self:end;padding-bottom:8px}
+.chk-cls input{accent-color:var(--firebrick);width:16px;height:16px}
+/* Configurações */
+.side-cfg{margin-bottom:-4px}
+.cfg-add{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:14px;display:grid;gap:8px}
+.cfg-res{display:flex;flex-wrap:wrap;gap:6px}.cfg-res:empty{display:none}
+.cfg-hit{all:unset;cursor:pointer;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px}.cfg-hit:hover{background:var(--sunken)}.cfg-hit:focus-visible{outline:2px solid var(--red)}
+.cfg-user{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px}
+.cfg-top{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin-bottom:10px}.cfg-nome{display:grid;flex:1 1 220px;min-width:0}
+.cfg-abas{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.cfg-abas fieldset{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:0;display:grid;gap:4px}
+.cfg-abas legend{font:600 11px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 4px}
+.cfg-abas label{font-size:13px;display:flex;gap:6px;align-items:center}.cfg-abas input{accent-color:var(--firebrick)}
+/* ===== Layout 2026: lateral grafite e vermelho PKS, tema claro e escuro à escolha do usuário ===== */
+:root,:root[data-theme="light"]{--red:#d71f26;--red-ink:#c11a21;--red-bg:#fdecec;--brand:#d71f26;
+  --side-bg:#26282c;--side-ink:#f3f4f5;--side-mut:#a7abb1;--side-line:#3a3d42;--side-hover:#33363b;--side-on:#d71f26;
+  --bg:#f1f2f4;--panel:#ffffff;--sunken:#f5f6f7;--line:#e3e5e8;--ink:#1d1f22;--muted:#5d6168;--sombra:0 1px 2px rgba(16,24,40,.05),0 6px 18px rgba(16,24,40,.06);
+  --listra:rgba(20,22,26,.05);color-scheme:light}
+:root[data-theme="dark"]{--red:#e3262d;--red-ink:#ff6b70;--red-bg:#3d1c1e;--brand:#e3262d;
+  --side-bg:#18191c;--side-ink:#f3f4f5;--side-mut:#9ea2a8;--side-line:#2c2f33;--side-hover:#25272b;--side-on:#e3262d;
+  --bg:#1f2124;--panel:#2a2c30;--sunken:#303338;--line:#3a3d42;--ink:#f1f2f4;--muted:#a8acb2;--sombra:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.25);
+  --listra:rgba(255,255,255,.04);color-scheme:dark}
+body{background:var(--bg)}
+.side{background:var(--side-bg);color:var(--side-ink)}
+.mod{color:var(--side-ink)}.mod svg{color:var(--side-mut)}
+.mod.ativo,.side .chamar[aria-pressed="true"]{background:var(--side-on);color:#fff;font-weight:600;box-shadow:0 6px 16px rgba(215,31,38,.28)}
+.mod.ativo svg,.mod.ativo svg:first-child{color:#fff}
+.perfil i{background:var(--side-hover);color:var(--side-ink)}
+.mod:focus-visible,.side .chamar:focus-visible{outline:2px solid #fff;outline-offset:-2px}
+.bt-red{background:var(--red);color:#fff;box-shadow:0 6px 14px rgba(215,31,38,.25)}
+.bt-red:hover{background:var(--red-ink)}
+.home-kpi,.home-card,.home-banner,.nfa-painel,.cnf-card,.fp-card,.cfg-user{box-shadow:var(--sombra)}
+.home-kpi:first-child{border-bottom:3px solid var(--red)}
+.home-kpi .ico{background:var(--sunken);color:var(--ink)}
+.home-banner{background:var(--panel);border:1px solid var(--line);border-right:1px solid var(--line)}
+.home-banner .olho,.topo .olho{color:var(--red)}
+/* Cabeçalho da Home com faixas diagonais */
+.topo.topo-home{position:relative;overflow:hidden;margin:0 -4px;padding:22px 4px 18px}
+.topo.topo-home::after{content:"";position:absolute;right:-30px;top:-40px;width:360px;height:220px;pointer-events:none;
+  background:linear-gradient(118deg,transparent 0 30%,var(--listra) 30% 42%,transparent 42% 48%,var(--listra) 48% 58%,transparent 58% 64%,var(--red) 64% 100%);
+  clip-path:polygon(35% 0,100% 0,100% 100%,62% 100%)}
+.topo.topo-home>*{position:relative;z-index:1}
+.topo.topo-home h2{font-size:34px}
+.nome-red{color:var(--red)}
+/* Botão de tema */
+.tema-bt{all:unset;cursor:pointer;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--panel);border:1px solid var(--line);color:var(--ink)}
+.tema-bt:hover{background:var(--sunken)}.tema-bt:focus-visible{outline:2px solid var(--red)}
+.tema-bt svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tema-bt .ic-sol,:root[data-theme="dark"] .tema-bt .ic-lua{display:none}:root[data-theme="dark"] .tema-bt .ic-sol{display:block}
+.busca-sis{border-radius:999px}
+</style>
+
+<div class="app">
+<aside class="side" aria-label="Módulos">
+  <div class="side-logo"><span class="logo-pks" aria-hidden="true">PKS</span><div class="side-nome"><b>Sistema PKS</b><span>Gestão inteligente</span></div></div>
+  <span class="side-sec">Menu principal</span>
+  <nav class="mods" id="mods" aria-label="Módulos"></nav>
+  <div class="side-pol"><button type="button" class="chamar" id="polChamar" aria-pressed="false" aria-controls="pol"><svg viewBox="0 0 40 48" aria-hidden="true" focusable="false"><rect x="6" y="3" width="28" height="42" rx="7" fill="#F2B640" stroke="#B9701B" stroke-width="2"/><ellipse cx="15" cy="20" rx="3.6" ry="4.2" fill="#fff" stroke="#6B3410" stroke-width=".9"/><ellipse cx="25" cy="20" rx="3.6" ry="4.2" fill="#fff" stroke="#6B3410" stroke-width=".9"/><circle cx="15.5" cy="21" r="2" fill="#3B2412"/><circle cx="25.5" cy="21" r="2" fill="#3B2412"/><path d="M15 29 q5 4.5 10 0" fill="none" stroke="#6B3410" stroke-width="1.8" stroke-linecap="round"/></svg><span>Chamar assistente</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>
+  <div class="side-fim">
+    <a href="#config" class="mod side-cfg" id="cfgBt" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Configurações</span></a>
+    <div class="perfil"><i id="perfilIni" aria-hidden="true">PKS</i><div><b id="perfilNome">Usuário</b><span>Perfil de acesso</span></div></div>
+  </div>
+</aside>
+<nav class="subnav" id="subnav" aria-label="Itens do módulo"></nav>
+<div class="wrap">
+  <div class="barra-topo"><div class="trilha" id="trilha">Sistema PKS</div><label class="busca-sis"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg><input type="search" id="buscaSis" list="buscaSisL" placeholder="Buscar no sistema" aria-label="Buscar uma tela do sistema"><datalist id="buscaSisL"></datalist></label><span class="data-topo" id="dataTopo"></span><button type="button" class="tema-bt" id="temaBt" aria-label="Trocar para o tema escuro" title="Tema claro ou escuro"><svg class="ic-lua" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="ic-sol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button></div>
+  <div class="topo"><span class="olho" id="olhoMod"></span><h2 id="tituloMod">Home</h2><p id="subMod" hidden></p></div>
+
+  <div class="notasband" id="countsBox"><div class="counts" id="counts" aria-live="polite"></div></div>
+  <div class="perbox" id="perPanel" hidden></div>
+  <section id="v-home" class="section" hidden></section>
+  <section id="v-notas" class="section" hidden></section>
+  <section id="v-entrada" class="section" hidden></section>
+  <section id="v-lancadas" class="section" hidden></section>
+  <section id="v-padrao" class="section" hidden></section>
+  <section id="v-forn" class="section" hidden></section>
+  <section id="v-cfop" class="section" hidden></section>
+  <section id="v-clientes" class="section" hidden></section>
+  <section id="v-produtos" class="section" hidden></section>
+  <section id="v-nfe" class="section" hidden></section>
+  <section id="v-faturamento" class="section" hidden></section>
+  <section id="v-estrutura" class="section" hidden></section>
+  <section id="v-custonf" class="section" hidden></section>
+  <section id="v-formacao" class="section" hidden></section>
+  <section id="v-roteiro" class="section" hidden></section>
+  <section id="v-mc" class="section" hidden></section>
+  <section id="v-dre" class="section" hidden></section>
+  <section id="v-config" class="section" hidden></section>
+  <section id="v-bloqueio" class="section" hidden></section>
+</div>
+</div>
+<div class="toast" id="toast" hidden role="status"></div>
+<div class="pol" id="pol" hidden><div class="bal" role="status" aria-live="polite"><button type="button" id="polMin" aria-label="Fechar o balão do Polenta">×</button><div id="polTxt"></div></div><button type="button" class="polbtn" id="polBtn" aria-label="Polenta. Clique para mostrar ou esconder o balão. Botão direito para mais opções." aria-haspopup="menu"><svg class="boneco" viewBox="0 0 120 140" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="polMassa" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFD873"/><stop offset=".55" stop-color="#F2B640"/><stop offset="1" stop-color="#D98E22"/></linearGradient>
+  </defs>
+  <ellipse cx="60" cy="132" rx="26" ry="4.5" fill="#000" opacity=".12"/>
+  <g class="corpo">
+    <path class="braco" d="M33 80 Q22 86 17 97" fill="none" stroke="#8A4A14" stroke-width="2.6" stroke-linecap="round"/>
+    <g transform="translate(15 101)"><path d="M-7 -2 q0 -6 5 -6 q1 -5 5 -3 q3 -4 6 0 q4 0 3 5 q3 3 0 7 q-3 6 -11 5 q-8 -1 -8 -8z" fill="#fff" stroke="#6b6b6b" stroke-width="1.4" stroke-linejoin="round"/><path d="M1 -6 v5 M5 -6 v5" stroke="#b5b5b5" stroke-width="1" stroke-linecap="round"/></g>
+    <rect x="31" y="18" width="58" height="102" rx="13" fill="url(#polMassa)" stroke="#B9701B" stroke-width="2.4"/>
+    <path d="M38 26 h44" stroke="#FFF1B8" stroke-width="4" stroke-linecap="round" opacity=".75"/>
+    <g fill="#C97A1C" opacity=".55"><circle cx="40" cy="40" r="2.2"/><circle cx="80" cy="34" r="1.8"/><circle cx="84" cy="96" r="2.4"/><circle cx="42" cy="104" r="1.9"/><circle cx="66" cy="111" r="1.6"/><circle cx="37" cy="88" r="1.5"/><circle cx="79" cy="82" r="1.3"/></g>
+    <g fill="#FFE59A" opacity=".8"><circle cx="72" cy="44" r="1.4"/><circle cx="52" cy="98" r="1.6"/><circle cx="46" cy="32" r="1.1"/></g>
+    <path d="M44 44 q6 -4 11 -1 M65 43 q6 -3 11 1" fill="none" stroke="#6B3410" stroke-width="2" stroke-linecap="round"/>
+    <g class="olhos">
+      <ellipse cx="50" cy="57" rx="7.5" ry="8.5" fill="#fff" stroke="#6B3410" stroke-width="1.2"/>
+      <ellipse cx="71" cy="57" rx="7.5" ry="8.5" fill="#fff" stroke="#6B3410" stroke-width="1.2"/>
+      <circle cx="51" cy="59" r="4.2" fill="#3B2412"/><circle cx="72" cy="59" r="4.2" fill="#3B2412"/>
+      <circle cx="52.6" cy="57.2" r="1.5" fill="#fff"/><circle cx="73.6" cy="57.2" r="1.5" fill="#fff"/>
+    </g>
+    <ellipse cx="41" cy="72" rx="5" ry="3" fill="#F08A72" opacity=".45"/><ellipse cx="80" cy="72" rx="5" ry="3" fill="#F08A72" opacity=".45"/>
+    <path d="M51 74 q9.5 9 19 0" fill="none" stroke="#6B3410" stroke-width="2.6" stroke-linecap="round"/>
+    <g class="acena">
+      <path d="M88 76 Q99 70 103 58" fill="none" stroke="#8A4A14" stroke-width="2.6" stroke-linecap="round"/>
+      <g transform="translate(104 52) rotate(-20)"><path d="M-7 3 q-1 -7 3 -8 q0 -6 4 -6 q2 -4 5 -1 q4 -2 5 3 q4 1 2 6 q2 5 -3 9 q-6 4 -12 1 q-5 -2 -4 -4z" fill="#fff" stroke="#6b6b6b" stroke-width="1.4" stroke-linejoin="round"/><path d="M0 -5 v6 M4 -5 v6" stroke="#b5b5b5" stroke-width="1" stroke-linecap="round"/></g>
+    </g>
+  </g>
+</svg><svg class="cena" viewBox="0 0 220 160" aria-hidden="true" focusable="false">
+  <defs><linearGradient id="polMassa2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFD873"/><stop offset=".55" stop-color="#F2B640"/><stop offset="1" stop-color="#D98E22"/></linearGradient><linearGradient id="polLuzG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFF4B8" stop-opacity=".95"/><stop offset="1" stop-color="#FFF4B8" stop-opacity="0"/></linearGradient></defs>
+  <ellipse cx="110" cy="154" rx="98" ry="5" fill="#000" opacity=".12"/>
+  <rect x="86" y="30" width="68" height="90" rx="9" fill="#7A4E2D" stroke="#5C3A20" stroke-width="2"/>
+  <rect x="94" y="38" width="52" height="40" rx="6" fill="#8E5E37"/>
+  <polygon class="luz" points="56,52 72,46 156,110 74,112" fill="url(#polLuzG)"/>
+  <g>
+    <rect x="98" y="46" width="44" height="72" rx="10" fill="url(#polMassa2)" stroke="#B9701B" stroke-width="2"/>
+    <path d="M103 52 h34" stroke="#FFF1B8" stroke-width="3" stroke-linecap="round" opacity=".7"/>
+    <g fill="#C97A1C" opacity=".55"><circle cx="104" cy="96" r="1.6"/><circle cx="137" cy="58" r="1.4"/><circle cx="135" cy="100" r="1.7"/></g>
+    <path d="M104 58 q5 -3 9 -1 M127 57 q5 -2 9 1" fill="none" stroke="#6B3410" stroke-width="1.7" stroke-linecap="round"/>
+    <ellipse cx="111" cy="67" rx="5.5" ry="6" fill="#fff"/><ellipse cx="129" cy="67" rx="5.5" ry="6" fill="#fff"/>
+    <g class="pupilas"><circle cx="111.5" cy="70" r="2.8" fill="#3B2412"/><circle cx="129.5" cy="70" r="2.8" fill="#3B2412"/></g>
+    <circle cx="111" cy="67" r="7.4" fill="none" stroke="#3B2412" stroke-width="1.6"/><circle cx="129" cy="67" r="7.4" fill="none" stroke="#3B2412" stroke-width="1.6"/>
+    <path d="M118.4 66 q1.6 -1.6 3.2 0" fill="none" stroke="#3B2412" stroke-width="1.6"/>
+    <ellipse cx="104" cy="79" rx="3.6" ry="2.2" fill="#F08A72" opacity=".45"/><ellipse cx="136" cy="79" rx="3.6" ry="2.2" fill="#F08A72" opacity=".45"/>
+    <ellipse cx="120" cy="83" rx="2.6" ry="2.1" fill="#6B3410"/>
+  </g>
+  <rect x="14" y="110" width="192" height="9" rx="2" fill="#A0683A" stroke="#7A4E2D" stroke-width="1.5"/>
+  <rect x="22" y="119" width="176" height="30" fill="#8B5A2B" stroke="#7A4E2D" stroke-width="1.5"/>
+  <rect x="98" y="130" width="24" height="3.5" rx="1.7" fill="#5C3A20"/>
+  <path d="M119 109 L91 106 L95 95 L119 98 Z" fill="#FFFDF5" stroke="#C9BFA6" stroke-width="1"/>
+  <path d="M121 109 L149 106 L145 95 L121 98 Z" fill="#FFFDF5" stroke="#C9BFA6" stroke-width="1"/>
+  <path d="M98 99.5 l16 1.6 M97 102.5 l17 1.6 M126 101 l16 -1.6 M126 104 l17 -1.6" stroke="#B9B2A0" stroke-width=".9"/>
+  <path class="pagina" d="M121 109 L149 106 L145 95 L121 98 Z" fill="#FFF8E6" stroke="#C9BFA6" stroke-width="1"/>
+  <path d="M99 90 Q96 96 99 101 M141 90 Q144 96 141 101" fill="none" stroke="#8A4A14" stroke-width="2.2" stroke-linecap="round"/>
+  <g transform="translate(98 103)"><path d="M-5 -1 q0 -5 4 -5 q1 -3 4 -2 q3 -2 4 1 q3 1 2 4 q1 4 -3 6 q-5 2 -9 0 q-3 -2 -2 -4z" fill="#fff" stroke="#6b6b6b" stroke-width="1.2" stroke-linejoin="round"/></g>
+  <g transform="translate(142 103) scale(-1 1)"><path d="M-5 -1 q0 -5 4 -5 q1 -3 4 -2 q3 -2 4 1 q3 1 2 4 q1 4 -3 6 q-5 2 -9 0 q-3 -2 -2 -4z" fill="#fff" stroke="#6b6b6b" stroke-width="1.2" stroke-linejoin="round"/></g>
+  <g stroke="#00000033" stroke-width=".8">
+    <rect x="160" y="99" width="40" height="11" rx="1.5" fill="#2E6DA4"/>
+    <rect x="163" y="89" width="36" height="10" rx="1.5" fill="#C0392B"/>
+    <rect x="158" y="80" width="42" height="9" rx="1.5" fill="#27AE60"/>
+    <rect x="165" y="71" width="32" height="9" rx="1.5" fill="#8E44AD"/>
+    <rect x="161" y="63" width="38" height="8" rx="1.5" fill="#E67E22"/>
+    <rect x="60" y="80" width="7" height="30" rx="1" fill="#16A085"/>
+    <rect x="67" y="76" width="8" height="34" rx="1" fill="#2C3E50"/>
+    <rect x="75" y="83" width="6" height="27" rx="1" fill="#D35400"/>
+    <rect x="81" y="88" width="9" height="22" rx="1" fill="#7F8C8D" transform="rotate(12 85 110)"/>
+  </g>
+  <path d="M166 102 h28 M168 93 h26 M164 84 h30 M170 75 h22 M166 67 h28" stroke="#ffffff66" stroke-width="1"/>
+  <ellipse cx="32" cy="109" rx="13" ry="3.5" fill="#3D4248"/>
+  <path d="M32 108 L24 74 L50 46" fill="none" stroke="#4A5057" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="24" cy="74" r="3.2" fill="#3D4248"/>
+  <path d="M40 36 L64 28 L72 50 L52 56 Z" fill="#E8B23A" stroke="#B9851E" stroke-width="1.6" stroke-linejoin="round"/>
+  <ellipse cx="62" cy="53" rx="9" ry="3" fill="#FFF4B8" transform="rotate(-17 62 53)"/>
+</svg></button></div>
+<div class="polmenu" id="polMenu" role="menu" aria-label="Opções do Polenta" hidden><button type="button" role="menuitem" data-pol="analisar">Analisar as notas</button><button type="button" role="menuitem" data-pol="dancar">Dançar</button><button type="button" role="menuitem" data-pol="sair">Dispensar</button></div>
+
+<script>
+const S={notas:[],meta:null,padrao:null,hist:null,db:null,dbState:'loading',fStatus:'todas',q:'',open:new Set(),hq:'',hTipo:'todas',hLim:40,hOpen:new Set(),pOpen:new Set(),eTipo:'NF-e',eSt:'todas',eq:'',eOpen:new Set(),tempo:null,periodos:null,perOpen:false,regras:{},dEdit:null,dDraft:{},sort:{},fq:'',fOpen:new Set(),fLim:30};
+const $=id=>document.getElementById(id);
+/* Tema claro ou escuro: escolha de cada pessoa, guardada neste navegador. */
+function aplicaTema(t){document.documentElement.dataset.theme=t;const b=$('temaBt');if(b)b.setAttribute('aria-label',t==='dark'?'Trocar para o tema claro':'Trocar para o tema escuro')}
+(()=>{let t='light';try{t=localStorage.getItem('pks_tema')||'light'}catch{}aplicaTema(t)})();
+document.addEventListener('click',e=>{if(!e.target.closest('#temaBt'))return;const t=document.documentElement.dataset.theme==='dark'?'light':'dark';aplicaTema(t);try{localStorage.setItem('pks_tema',t)}catch{}if(window.MOD&&window.MOD.atual==='faturamento')window.MOD.mostrar('faturamento')});
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const moneyF=new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const money=v=>moneyF.format(+v||0);
+const qty=v=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(+v||0);
+const dt=s=>s?s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4):'';
+const comp=s=>s?s.slice(5,7)+'/'+s.slice(0,4):'';
+const STATUS={em_aberto:['Em aberto','p-open'],pronta:['Pronta para lançar','p-ready'],lancada:['Lançada','p-done']};
+const ALERT={bloqueio:['Bloqueio','p-stop'],atencao:['Atenção','p-warn'],info:['Info','p-info']};
+const RET={irrf:'IRRF',iss:'ISS',inss:'INSS',pisr:'PIS',cofr:'COFINS',csll:'CSLL'};
+const TIPO={N:'Normal',C:'Complemento / CT-e',B:'Beneficiamento',D:'Devolução'};
+let toastT;function toast(t){const e=$('toast');e.textContent=t;e.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>e.hidden=true,3500)}
+
+const IC={home:'<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/>',
+  cadastros:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',
+  entradas:'<path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 19h14"/>',
+  faturamento:'<path d="M4 5h2l2 10h10l2-7H7"/><circle cx="10" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/>',
+  estruturas:'<path d="M12 3l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4M4 17l8 4 8-4"/>',
+  contabilidade:'<path d="M6 3h11a2 2 0 0 1 2 2v16H8a2 2 0 0 1-2-2z"/><path d="M6 19a2 2 0 0 1 2-2h11M10 8h6M10 12h4"/>'};
+const MODS=[['home','Home',[['home','Home']]],['cadastros','Cadastros',[['-','Classificação'],['forn','Fornecedores'],['cfop','CFOP'],['-','Clientes e produtos'],['clientes','Clientes'],['produtos','Produtos']]],
+  ['entradas','Entradas',[['-','Lançador de NF'],['notas','Notas para lançar'],['entrada','Entrada de Notas'],['lancadas','Lançadas'],['padrao','Padrão de lançamento'],['-','Análise'],['nfe','NF-e'],['custonf','Custo NF entrada']]],
+  ['estruturas','Estruturas',[['estrutura','Estrutura do produto'],['formacao','Formação de preço'],['roteiro','Roteiro']]],
+  ['faturamento','Faturamento',[['faturamento','Faturamento']]],
+  ['contabilidade','Contabilidade',[['mc','MC'],['dre','DRE']]],
+  ['config','Configurações',[['config','Usuários']]]];
+const ABAS=MODS.flatMap(m=>m[2].map(a=>a[0]).filter(a=>a!=='-'));
+const modDe=t=>MODS.find(m=>m[2].some(a=>a[0]===t));
+/* Subitens visíveis: tela liberada; título de grupo só se alguma tela do grupo aparece. */
+function subVis(A){const out=[];let h=null;for(const x of A){if(x[0]==='-'){h=x;continue}if(!podeVer(x[0]))continue;if(h){out.push(h);h=null}out.push(x)}return out}
+function desenhaMenu(t){
+  const atual=modDe(t),aberto=MODS.find(m=>m[0]===S.modAberto)||atual,sub=!!S.subAberto;$('subnav').hidden=!sub;
+  const VIS=MODS.filter(m=>m[0]!=='config'&&m[2].some(a=>a[0]!=='-'&&podeVer(a[0])));$('cfgBt').hidden=!S.acesso.adm;$('cfgBt').classList.toggle('ativo',t==='config');
+  $('mods').innerHTML=VIS.map(([k,l])=>`<button type="button" class="mod${k===atual[0]?' ativo':''}${sub&&k===aberto[0]?' aberto':''}" data-mod="${k}" aria-expanded="${sub&&k===aberto[0]}" aria-controls="subnav"><svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg><span>${l}</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>`).join('');
+  $('subnav').innerHTML=`<span class="sub-t">${aberto[1]}</span>`+subVis(aberto[2]).map(([a,l])=>a==='-'?`<span class="sub-h">${l}</span>`:`<a href="#${a}" data-tab="${a}"${a===t?' aria-current="page"':''}><i aria-hidden="true"></i>${l}</a>`).join('');
+}
+function route(){let t=ABAS.includes(location.hash.slice(1))?location.hash.slice(1):'home';
+  if(!podeVer(t)){const p=ABAS.find(a=>a!=='config'&&podeVer(a));if(p&&p!==t){location.hash='#'+p;return}if(!p){mostraBloqueio();return}}
+  $('v-bloqueio').hidden=true;
+  /* Ao trocar de aba, ela abre na tela inicial: sem filtros, busca ou itens abertos da visita anterior. */
+  if(t!==S.abaAnt){if(S.abaAnt!==undefined){Object.assign(S,{fStatus:'todas',q:'',qRaw:undefined,hq:'',hqRaw:undefined,hTipo:'todas',hLim:40,eTipo:'NF-e',eSt:'todas',eq:'',eqRaw:undefined,fq:'',fqRaw:undefined,fLim:30,sort:{},perOpen:false});for(const x of [S.open,S.hOpen,S.pOpen,S.eOpen,S.fOpen])x.clear();
+    try{({notas:renderNotas,entrada:renderEntrada,lancadas:renderLancadas,padrao:renderPadrao})[t]?.()}catch{}scrollTo(0,0);document.querySelectorAll('main,.main,.conteudo').forEach(e=>e.scrollTop=0)}S.abaAnt=t}
+  for(const k of ABAS)$('v-'+k).hidden=k!==t;
+  S.modAberto=modDe(t)[0];S.subAberto=false;desenhaMenu(t);
+  const m=modDe(t),nomeT=m[2].find(a=>a[0]===t)[1];
+  if(t==='home'){const hr=new Date().getHours();$('olhoMod').textContent='Painel de controle';$('tituloMod').innerHTML=(hr<12?'Bom dia':hr<18?'Boa tarde':'Boa noite')+(S.perfil?', <span class="nome-red">'+esc(S.perfil)+'</span>':'');$('subMod').textContent='Acompanhe os principais indicadores e acesse rapidamente as áreas do sistema.';$('subMod').hidden=false;$('trilha').innerHTML='Sistema PKS<span class="sep">/</span><b>Home</b>'}
+  else{$('olhoMod').textContent=m[1];$('tituloMod').textContent=nomeT;$('subMod').hidden=true;$('trilha').innerHTML='Sistema PKS<span class="sep">/</span>'+m[1]+(m[1]!==nomeT?'<span class="sep">/</span><b>'+nomeT+'</b>':'')}
+  document.querySelector('.topo').classList.toggle('topo-home',t==='home');
+  const nb=$('countsBox');if(nb)nb.hidden=t!=='notas';document.querySelector('.topo').hidden=t==='nfe';const pp=$('perPanel');if(pp&&t!=='notas')pp.hidden=true;
+  if(t==='config')renderConfig();
+  if(window.MOD)window.MOD.mostrar(t)}
+const abaAtual=()=>ABAS.includes(location.hash.slice(1))?location.hash.slice(1):'home';
+function fechaSub(foco){if(!S.subAberto)return;S.subAberto=false;desenhaMenu(abaAtual());if(foco)document.querySelector(`button.mod[data-mod="${S.modAberto}"]`)?.focus()}
+/* O painel de subitens só aparece ao clicar num módulo e fecha ao escolher um item, clicar fora ou apertar Esc. */
+document.addEventListener('click',e=>{const b=e.target.closest('button.mod');
+  if(b){const k=b.dataset.mod;if(k==='home'){S.subAberto=false;location.hash='#home';route();return}if(S.subAberto&&S.modAberto===k){fechaSub(true);return}S.modAberto=k;S.subAberto=true;desenhaMenu(abaAtual());$('subnav').querySelector('a')?.focus();return}
+  const a=e.target.closest('#subnav a');if(a){if(a.getAttribute('href')===location.hash)fechaSub(false);return}
+  if(S.subAberto&&!e.target.closest('#subnav'))fechaSub(false)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.subAberto)fechaSub(true)});
+addEventListener('hashchange',route);
+/* Topo: data de hoje e busca rápida pelas telas. */
+$('dataTopo').textContent=new Date().toLocaleDateString('pt-BR',{day:'numeric',month:'short',year:'numeric'}).replace(/\./g,'').replace(/ de /g,' ');
+const TELAS=MODS.flatMap(m=>m[2].filter(a=>a[0]!=='-').map(a=>[a[0],m[1]===a[1]?a[1]:m[1]+' › '+a[1]]));
+$('buscaSisL').innerHTML=TELAS.map(([,l])=>`<option value="${l}">`).join('');
+const vaiBusca=v=>{v=(v||'').trim().toLowerCase();if(!v)return;const TV=TELAS.filter(x=>podeVer(x[0]));const a=TV.find(([,l])=>l.toLowerCase()===v)||TV.find(([,l])=>l.toLowerCase().includes(v));if(a){location.hash='#'+a[0];$('buscaSis').value='';$('buscaSis').blur()}else toast('Nenhuma tela com esse nome.')};
+$('buscaSis').addEventListener('change',e=>vaiBusca(e.target.value));
+$('buscaSis').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();vaiBusca(e.target.value)}});
+/* Acesso por pessoa. Administrador (dono ou editor do artifact) vê tudo e entra em Configurações.
+   Os demais precisam estar em usuarios/<id do Claude> com setor e abas liberadas; sem cadastro, nada aparece.
+   Isso só esconde telas: quem tem o link do artifact consegue ler os dados publicados. */
+const SETORES=['Financeiro','PCP/Compras','Diretoria','Logística'];
+S.acesso={pronto:false,adm:false,reg:null};S.usuarios=[];S.cfgHits=[];
+function podeVer(t){const A=S.acesso;if(!A.pronto)return false;if(A.adm)return true;if(t==='config')return false;return !!(A.reg&&(A.reg.abas||[]).includes(t))}
+function mostraBloqueio(){for(const k of ABAS)$('v-'+k).hidden=true;const b=$('v-bloqueio');b.hidden=false;
+  b.innerHTML=S.acesso.pronto?'<div class="empty"><b>Seu acesso ainda não foi liberado.</b><br>Peça ao administrador do Sistema PKS para liberar as telas do seu setor.</div>':'<div class="empty">Verificando o seu acesso…</div>';
+  $('olhoMod').textContent='Sistema PKS';$('tituloMod').textContent='Acesso';$('subMod').hidden=true;$('trilha').innerHTML='Sistema PKS';desenhaMenu('home')}
+async function iniciaAcesso(){
+  const u=await (window.claude?.use?window.claude.use('user'):Promise.resolve(null)).catch(()=>null);S.userCap=u;
+  let me=null;try{me=u?await u.me():null}catch{}
+  const adm=!!(me&&(me.isOwner||me.canEdit));
+  const db=await (window.claude?.use?window.claude.use('db'):Promise.resolve(null)).catch(()=>null);
+  if(adm){S.acesso={pronto:true,adm:true,reg:null};S.perfil='Administrador';
+    if(db)db.collection('usuarios').onSnapshot(sn=>{S.usuarios=sn.docs.map(d=>({id:d.id,...d.data()}));if(abaAtual()==='config')renderConfig()},()=>{});}
+  else if(me&&me.id&&db){db.doc('usuarios/'+me.id).onSnapshot(sn=>{const reg=sn.exists?sn.data():null;S.acesso={pronto:true,adm:false,reg};S.perfil=reg?.setor||'Sem acesso';perfilUI();route()},()=>{S.acesso={pronto:true,adm:false,reg:null};route()});}
+  else{S.acesso={pronto:true,adm:false,reg:null};S.perfil='Sem acesso'}
+  perfilUI();route()}
+function perfilUI(){if(!S.perfil)return;$('perfilNome').textContent=S.perfil;$('perfilIni').textContent=S.perfil.replace(/[^A-Za-zÀ-ú]/g,'').slice(0,2).toUpperCase()}
+/* Configurações › Usuários */
+async function renderConfig(){const box=$('v-config');if(!S.acesso.adm){box.innerHTML='';return}
+  const U=S.usuarios;let ps={};try{if(U.length&&S.userCap)ps=await S.userCap.profiles(U.map(x=>x.id))}catch{}
+  const GR=MODS.filter(m=>m[0]!=='config').map(([k,l,a])=>[l,a.filter(x=>x[0]!=='-')]);
+  let h=`<div class="cfg-add"><label class="campo cresce"><span>Adicionar pessoa</span><input type="search" id="cfgBusca" placeholder="Nome ou e-mail de quem já tem acesso ao link" autocomplete="off"></label><div id="cfgRes" class="cfg-res"></div>
+    <p class="small muted">A pessoa precisa primeiro receber o link pelo botão Compartilhar do Claude. Depois ela aparece nesta busca.</p></div>`;
+  if(!U.length)h+='<div class="empty">Nenhuma pessoa cadastrada ainda.</div>';
+  for(const x of U){const p=ps[x.id]||{};const ab=new Set(x.abas||[]);
+    h+=`<div class="cfg-user"><div class="cfg-top"><div class="cfg-nome"><b>${esc(p.name||'Pessoa sem nome visível')}</b><span class="small muted">${esc(p.email||'')}</span></div>
+      <label class="campo"><span>Setor</span><select data-usetor="${esc(x.id)}"><option value="">Escolher…</option>${SETORES.map(o=>`<option ${x.setor===o?'selected':''}>${esc(o)}</option>`).join('')}</select></label>
+      <button type="button" class="bt cfg-tudo" data-utudo="${esc(x.id)}">Marcar tudo</button><button type="button" class="bt" data-urem="${esc(x.id)}">Remover</button></div>
+      <div class="cfg-abas">${GR.map(([l,a])=>`<fieldset><legend>${esc(l)}</legend>${a.map(([k,n])=>`<label><input type="checkbox" data-uaba="${esc(x.id)}" value="${k}" ${ab.has(k)?'checked':''}> ${esc(n)}</label>`).join('')}</fieldset>`).join('')}</div></div>`}
+  box.innerHTML=h;desenhaHits()}
+function desenhaHits(){const r=$('cfgRes');if(!r)return;const ja=new Set(S.usuarios.map(x=>x.id));
+  r.innerHTML=S.cfgHits.filter(x=>!ja.has(x.id)).slice(0,8).map(x=>`<button type="button" class="cfg-hit" data-uadd="${esc(x.id)}"><b>${esc(x.name)}</b> <span class="small muted">${esc(x.email||'')}</span></button>`).join('')}
+async function salvaUsuario(id,patch){if(!S.db){toast('Sem conexão com a base.');return}const atual={...(S.usuarios.find(x=>x.id===id)||{}),...patch,em:new Date().toISOString()};delete atual.id;
+  try{await S.db.doc('usuarios/'+id).set(atual);toast('Acesso salvo.')}catch{toast('Não foi possível salvar. Só o administrador altera usuários.')}}
+document.addEventListener('input',async e=>{if(e.target.id!=='cfgBusca'||!S.userCap)return;const q=e.target.value.trim();S.cfgHits=q?await S.userCap.search(q):[];desenhaHits()});
+document.addEventListener('click',async e=>{const t=e.target;
+  const ad=t.closest('[data-uadd]');if(ad){await salvaUsuario(ad.dataset.uadd,{setor:'',abas:[]});S.cfgHits=[];const b=$('cfgBusca');if(b)b.value='';return}
+  const rm=t.closest('[data-urem]');if(rm){if(!confirm('Remover o acesso desta pessoa ao Sistema PKS?'))return;try{await S.db.doc('usuarios/'+rm.dataset.urem).delete();toast('Acesso removido.')}catch{toast('Não foi possível remover.')}return}
+  const tu=t.closest('[data-utudo]');if(tu){await salvaUsuario(tu.dataset.utudo,{abas:ABAS.filter(a=>a!=='config')});return}});
+document.addEventListener('change',async e=>{const t=e.target;
+  if(t.dataset.usetor){await salvaUsuario(t.dataset.usetor,{setor:t.value});return}
+  if(t.dataset.uaba){const id=t.dataset.uaba;const abas=[...document.querySelectorAll(`[data-uaba="${CSS.escape(id)}"]:checked`)].map(x=>x.value);await salvaUsuario(id,{abas});return}});
+
+function counts(){const c={em_aberto:0,pronta:0,lancada:0};S.notas.forEach(n=>c[n.status]=(c[n.status]||0)+1);
+  $('counts').innerHTML=`<div class="count open"><b>${c.em_aberto}</b><span>Em aberto</span></div><div class="count ready"><b>${c.pronta}</b><span>Prontas para lançar</span></div><div class="count done"><b>${c.lancada}</b><span>Lançadas aqui</span></div><button type="button" class="count period" id="perBtn" aria-expanded="${S.perOpen}" aria-controls="perPanel"><b>${mesAberto()?comp(mesAberto()):'–'}</b><span>Período aberto</span></button>`;return c}
+
+/* ---------- Qive ---------- */
+/* qiveStatus: notas que o Qive marcou como sincronizadas no ERP ou canceladas. qiveRodadas: resumo de cada leitura diária. */
+function aplicaQive(){
+  const sinc=new Set(),canc=new Set();
+  for(const d of S.qiveStatus||[]){(d.sinc||[]).forEach(x=>sinc.add(x));(d.canc||[]).forEach(x=>canc.add(x))}
+  S.notasTodas=(S.notasBrutas||[]).filter(n=>!n.arquivada).map(n=>({...n,sincErp:n.sincErp||sinc.has(n.seq),cancelada:n.cancelada||(canc.has(n.seq)?'qive':null)}));
+  S.notas=S.notasTodas.filter(n=>n.status==='lancada'||(!n.foraDoImportador&&!n.sincErp&&!n.cancelada));
+}
+const ultimaRodada=()=>[...(S.qiveRodadas||[])].sort((a,b)=>String(b.em).localeCompare(String(a.em)))[0];
+
+/* ---------- Natureza e CFOP ---------- */
+/* Lançada: CFOP gravado no Protheus. Nota já aberta: cfopEntrada, o Cod.Fiscal lido no importador. Sem leitura: só o final previsto pela TES sugerida. */
+function cfopInfo(n){
+  const lanc=[...new Set((n.lancamento?.itens||[]).map(i=>i.cfop).filter(Boolean))];
+  if(n.status==='lancada'&&lanc.length)return {v:lanc.join(', '),real:true,tit:'CFOP lançado no Protheus'};
+  if(n.cfopEntrada?.length)return {v:[...new Set(n.cfopEntrada)].join(', '),real:true,tit:'CFOP de entrada lido no importador. Muda se a TES mudar.'};
+  const su=n.sugestao?.sufixo;
+  return su?{v:'x'+su,real:false,tit:'Final previsto pela TES sugerida. O primeiro dígito aparece quando a nota for aberta.'}:{v:'',real:false,tit:''};
+}
+const natCell=n=>n.natOp?`<span class="natop" title="${esc(n.natOp)}">${esc(n.natOp)}</span>`:'<span class="muted">–</span>';
+function cfopCell(n){const c=cfopInfo(n);if(!c.v)return '<span class="muted">–</span>';return `<span class="mono ${c.real?'':'muted'}" title="${esc(c.tit)}">${esc(c.v)}</span>`}
+
+/* ---------- Decisões sobre os pontos de atenção ---------- */
+const KIND={tes:'TES',semhist:'Sem histórico',database:'Data-base',pedido:'Pedido',outro:'Outro ponto'};
+const kindDe=t=>/usou \d+ TES/.test(t)?'tes':/sem histórico/i.test(t)?'semhist':/data-base/i.test(t)?'database':/pedido/i.test(t)?'pedido':'outro';
+const pontosDe=n=>[...new Set((n.alertas||[]).filter(a=>a.n==='atencao').map(a=>kindDe(a.t)))];
+/* Vale a decisão da nota; sem ela, a regra do fornecedor; sem ela, a regra geral. */
+function decisaoDe(n,k){const o=n.decisoes?.[k];if(o)return {...o,fonte:'nota'};
+  const f=n.forn&&S.regras[k+'__'+n.forn];if(f)return {...f,fonte:'forn'};
+  const g=S.regras[k+'__todos'];return g?{...g,fonte:'todas'}:null}
+const regraId=(n,k,esc)=>esc==='forn'&&n.forn?k+'__'+n.forn:esc==='todas'?k+'__todos':null;
+async function salvaDec(seq,k,valor,escopo){
+  const n=S.notas.find(x=>x.seq===seq);if(!n)return;
+  if(!S.db){toast('Sem conexão com a base. A decisão não foi salva.');return}
+  const antes=n.decisoes?.[k]||null;valor=String(valor||'').trim().slice(0,200);
+  const esc=valor?(escopo||antes?.escopo||'nota'):null;const hoje=new Date().toISOString();
+  try{
+    await S.db.doc('notas/'+seq).update({decisoes:{...(n.decisoes||{}),[k]:valor?{valor,escopo:esc,em:hoje}:null}});
+    const idA=antes?regraId(n,k,antes.escopo):null,idN=valor?regraId(n,k,esc):null;
+    if(idA&&idA!==idN&&S.regras[idA]?.seq===seq)await S.db.doc('regras/'+idA).delete();
+    if(idN)await S.db.doc('regras/'+idN).set({kind:k,forn:esc==='forn'?n.forn:null,nome:esc==='forn'?(n.nome||''):'',valor,escopo:esc,em:hoje,doc:n.doc,seq});
+    toast(valor?(idN?'Decisão salva e aplicada nas próximas notas.':'Decisão salva nesta nota.'):'Decisão removida.');
+  }catch{toast('A decisão não foi salva. Tente novamente.');renderNotas()}
+}
+function cellSeguir(n){
+  const al=n.alertas||[];
+  if(n.status==='lancada'){const v=pontosDe(n).map(k=>decisaoDe(n,k)?.valor).filter(Boolean);return v.length?`<span class="small">${esc(v.join('; '))}</span>`:'<span class="muted">–</span>'}
+  if(al.some(a=>a.n==='bloqueio'))return '<span class="small muted">Resolver no Protheus</span>';
+  const ks=pontosDe(n);if(!ks.length)return '<span class="muted">–</span>';
+  return `<div class="decs">${ks.map(k=>{
+    const d=decisaoDe(n,k),key=n.seq+'|'+k,attr=`data-seq="${esc(n.seq)}" data-k="${k}"`,rot=`${KIND[k]} da nota ${esc(n.doc)}`;
+    const sg=n.sugestao,ops=k==='tes'&&sg?[...new Set([sg.tes,...(sg.alts||[])])]:[];
+    const comSel=ops.length&&S.dEdit!==key&&(!d||ops.includes(d.valor));
+    const ctrl=comSel
+      ?`<select class="dec-sel ${d?'feita':''}" ${attr} aria-label="O que seguir: ${rot}"><option value="">Escolher…</option>${ops.map((o,i)=>`<option value="${esc(o)}" ${d?.valor===o?'selected':''}>TES ${esc(o)}${i===0?' (principal)':''}</option>`).join('')}<option value="__txt">Escrever…</option></select>`
+      :`<input type="text" class="dec-txt ${d?'feita':''}" ${attr} maxlength="200" placeholder="O que seguir" value="${esc(S.dDraft[key]??d?.valor??'')}" aria-label="O que seguir: ${rot}">`;
+    const baixo=d?.fonte==='nota'
+      ?`<select class="esc dec-esc" ${attr} aria-label="Onde aplicar: ${rot}"><option value="nota" ${d.escopo==='nota'?'selected':''}>Só esta nota</option>${n.forn?`<option value="forn" ${d.escopo==='forn'?'selected':''}>Próximas deste fornecedor</option>`:''}<option value="todas" ${d.escopo==='todas'?'selected':''}>Todas com este ponto</option></select>`
+      :d?`<span class="pill p-info">${d.fonte==='forn'?'Regra do fornecedor':'Regra geral'}</span>`:'';
+    return `<div class="dec"><span class="small muted">${KIND[k]}</span>${ctrl}${baixo}</div>`}).join('')}</div>`;
+}
+function regrasBox(){
+  const r=Object.entries(S.regras);if(!r.length)return '';
+  return `<div class="section"><h2>Regras definidas por você</h2><p class="small muted">Valem para as próximas notas com o mesmo ponto de atenção. Uma decisão na própria nota vale mais que a regra.</p><div class="scroll"><table><thead><tr><th>Ponto</th><th>Onde vale</th><th>O que seguir</th><th>Definida em</th><th></th></tr></thead><tbody>${r.map(([id,x])=>`<tr><td>${esc(KIND[x.kind]||x.kind)}</td><td>${x.forn?`<span class="mono">${esc(x.forn)}</span> <span class="small">${esc(x.nome)}</span>`:'Todas as notas'}</td><td>${esc(x.valor)}</td><td>${dt(String(x.em||'').slice(0,10))}<span class="muted small"> na nota ${esc(x.doc)}</span></td><td><button class="act" data-rdel="${esc(id)}">Remover</button></td></tr>`).join('')}</tbody></table></div></div>`;
+}
+
+/* ---------- Períodos ---------- */
+/* Só existe um corte: tudo até fechadoAte está fechado e tudo depois está aberto. */
+const somaMes=(ym,d)=>{const y=+ym.slice(0,4),m=+ym.slice(5,7)-1+d,x=new Date(y,m,1);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')};
+const fimMes=ym=>String(new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate()).padStart(2,'0')+'/'+ym.slice(5,7)+'/'+ym.slice(0,4);
+const mesAberto=()=>S.periodos?.fechadoAte?somaMes(S.periodos.fechadoAte,1):null;
+function lancarEm(n){
+  if(n.status==='lancada')return n.competencia||null;
+  const e=(n.emissao||'').slice(0,7),a=mesAberto();
+  if(!e)return null;
+  if(!a)return n.competencia||null;
+  return e<a?a:e;
+}
+function renderPeriodo(){
+  const box=$('perPanel');if(!box)return;box.hidden=!S.perOpen;if(!S.perOpen)return;
+  const a=mesAberto();
+  if(!a){box.innerHTML='<p class="small muted">Carregando os períodos…</p>';return}
+  const f=S.periodos.fechadoAte,meses=[-2,-1,0,1,2,3].map(d=>somaMes(a,d));
+  const movidas=S.notas.filter(n=>n.status!=='lancada'&&n.emissao&&n.emissao.slice(0,7)<a).length;
+  box.innerHTML=`<div class="tools" style="justify-content:space-between"><h2>Período aberto: ${comp(a)}</h2><div class="tools"><button class="act" id="perReabrir">Reabrir ${comp(f)}</button><button class="act" id="perFechar">Fechar ${comp(a)}</button></div></div>
+  <p class="small">Notas emitidas até ${fimMes(a)} são lançadas em ${comp(a)}, mesmo as de meses anteriores. Notas emitidas depois disso são lançadas no mês da emissão.${movidas?` Hoje, ${movidas} nota${movidas===1?'':'s'} não lançada${movidas===1?'':'s'} de meses fechados ${movidas===1?'entra':'entram'} em ${comp(a)}.`:''}</p>
+  <div class="perlist">${meses.map(m=>`<span class="pill ${m<a?'p-open':'p-done'}">${comp(m)} ${m<a?'fechado':'aberto'}</span>`).join('')}</div>`;
+}
+async function mudaPeriodo(novo,msg){
+  if(!S.db){toast('Sem conexão com a base. O período não foi alterado.');return}
+  try{await S.db.doc('meta/periodos').set({fechadoAte:novo,atualizadoEm:new Date().toISOString()});toast(msg)}
+  catch{toast('O período não foi alterado. Tente novamente.')}
+}
+
+/* Busca: todas as palavras digitadas precisam aparecer, em qualquer ordem. */
+Object.defineProperty(String.prototype,'casa',{value:function(q){return String(q).split(/\s+/).filter(Boolean).every(w=>this.includes(w))},configurable:true});
+
+/* ---------- Ordenação ---------- */
+/* Cada coluna: [valor, começa do maior]. Texto começa de A a Z; número e data, do maior para o menor. */
+const STATUS_ORD={em_aberto:'Em aberto',pronta:'Pronta para lançar',lancada:'Lançada'};
+const SORT={
+  notas:{status:[n=>STATUS_ORD[n.status]||n.status],tipo:[n=>n.tipo],doc:[n=>n.doc],nome:[n=>n.nome],natop:[n=>n.natOp],cfop:[n=>cfopInfo(n).v],emissao:[n=>n.emissao,1],comp:[n=>lancarEm(n),1],valor:[n=>+n.valorTotal,1],tes:[n=>n.sugestao?.tes],pontos:[n=>{const a=n.alertas||[];return a.some(x=>x.n==='bloqueio')?1000:a.filter(x=>x.n==='atencao'&&!decisaoDe(n,kindDe(x.t))).length},1],seguir:[n=>pontosDe(n).map(k=>decisaoDe(n,k)?.valor).filter(Boolean).join('; ')]},
+  plat:{doc:[n=>n.doc],nome:[n=>n.nome],natop:[n=>n.natOp],cfop:[n=>cfopInfo(n).v],emissao:[n=>n.emissao,1],data:[n=>n.lancamento?.data,1],valor:[n=>+n.valorTotal,1],tes:[n=>[...new Set((n.lancamento?.itens||[]).map(i=>i.tes).filter(Boolean))].join(', ')],tempo:[n=>n.tempoSeg>0?n.tempoSeg:null,1]},
+  hist:{doc:[n=>n.d],forn:[n=>fName(n.f)],tipo:[n=>TIPO[n.t]||n.t],emissao:[n=>n.e,1],dig:[n=>n.g,1],itens:[n=>n.i.length,1],total:[n=>+n.v,1],tes:[n=>[...new Set(n.i.map(i=>i[7]))].join(', ')],um:[n=>[...new Set(n.i.map(i=>i[3]))].join(', ')],ret:[n=>Object.keys(n.r).map(x=>RET[x]).join(', ')]},
+  ent:{doc:[n=>n.doc],nome:[n=>n.nome],emissao:[n=>n.emissao,1],natop:[n=>n.natOp],valor:[n=>+n.valorTotal,1],itens:[n=>itensDe(n).length||null,1],st:[n=>({aberto:1,recebida:2,lancada:3})[entradaDe(n)]]},
+  tes:{tes:[t=>t.tes],desc:[t=>t.desc],cfop:[t=>t.cfops.join(', ')],tipo:[t=>t.tipo.map(x=>TIPO[x]||x).join(', ')],linhas:[t=>t.linhas,1],pedido:[t=>t.pedido,1],icms:[t=>t.icms,1],ipi:[t=>t.ipi,1],cc:[t=>t.cc,1],arm:[t=>t.arm.join(', ')]},
+  forn:{nome:[f=>f.nome],notas:[f=>f.notas,1],linhas:[f=>f.linhas,1],tes:[f=>f.tes.map(t=>t[0]).join(', ')],conf:[f=>f.conf,1],ped:[f=>f.ped,1],cc:[f=>f.cc[0]?.[0]],conta:[f=>f.conta[0]?.[0]],ret:[f=>f.ret.map(x=>RET[x]).join(', ')]}
+};
+const COLL=new Intl.Collator('pt-BR',{numeric:true,sensitivity:'base'});
+const vazio=v=>v===null||v===undefined||v===''||(typeof v==='number'&&Number.isNaN(v));
+function ordenar(t,list){const st=S.sort[t];if(!st)return list;const fn=SORT[t][st.k][0],sg=st.desc?-1:1;
+  return list.map(x=>[fn(x),x]).sort(([a],[b])=>{const va=vazio(a),vb=vazio(b);if(va||vb)return va===vb?0:va?1:-1;
+    return sg*(typeof a==='number'&&typeof b==='number'?a-b:COLL.compare(String(a),String(b)))}).map(p=>p[1])}
+function th(t,k,l,cls){const st=S.sort[t],on=st?.k===k;
+  return `<th${cls?` class="${cls}"`:''}${on?` aria-sort="${st.desc?'descending':'ascending'}"`:''}><button type="button" class="sort" data-st="${t}" data-sk="${k}" title="Ordenar por ${l}">${l}<i aria-hidden="true">${on?(st.desc?'▼':'▲'):'↕'}</i></button></th>`}
+function clicaSort(t,k){const st=S.sort[t];S.sort[t]=st?.k===k?{k,desc:!st.desc}:{k,desc:!!SORT[t][k][1]};
+  ({notas:renderNotas,plat:renderLancadas,hist:renderLancadas,tes:renderPadrao,forn:renderPadrao,ent:renderEntrada})[t]();
+  document.querySelector(`button.sort[data-st="${t}"][data-sk="${k}"]`)?.focus()}
+
+/* ---------- Notas ---------- */
+function renderNotas(){
+  if(S.polChamado)queueMicrotask(renderPolenta);
+  const c=counts();const m=S.meta;let h='';
+  if(S.dbState==='loading'&&!S.notas.length){$('v-notas').innerHTML='<div class="empty">Carregando as notas do importador…</div>';return}
+  if(S.dbState==='off'){$('v-notas').innerHTML='<div class="empty">Não foi possível acessar as notas nesta visualização. Abra a página com sua conta do Claude.</div>';return}
+  if(S.dbState==='slow')h+='<div class="note">As notas ainda não responderam. O que aparece aqui pode estar desatualizado.</div>';
+  const qr=ultimaRodada();if(qr){}else if(m){const falta=m.pendentes-m.lidas;h+=`<div class="note"><span><b>${m.lidas} de ${m.pendentes} notas</b> foram puxadas do importador em ${dt(m.puxadoEm)}.${falta>0?` Faltam ${falta}.`:''} Data-base da sessão no Protheus: ${dt(m.dataBase)}.</span><span class="small">Bloqueios no importador: ${m.emissorNaoCadastrado} sem emissor cadastrado, ${m.cteSemOrigem} CT-e sem documento de origem.</span></div>`}
+  if(c.pronta){const tot=S.notas.filter(n=>n.status==='pronta').reduce((a,n)=>a+(+n.valorTotal||0),0);
+    h+=`<div class="note ready"><span><b>${c.pronta} ${c.pronta>1?'notas prontas':'nota pronta'}</b>, R$ ${money(tot)}. O Polenta começa quando você pedir no chat: <b>“Polenta, lançar as notas prontas”</b>.</span><button class="act" id="copyCmd">Copiar o pedido</button></div>`}
+  const list=S.notas.filter(n=>(S.fStatus==='todas'||n.status===S.fStatus)&&(!S.q||[n.doc,n.nome,n.forn,n.natOp,n.seq].join(' ').toLowerCase().casa(S.q)));
+  h+=`<div class="tools"><div class="seg" role="group" aria-label="Filtrar por status">${[['todas','Todas'],['em_aberto','Em aberto'],['pronta','Prontas'],['lancada','Lançadas']].map(([k,l])=>`<button data-f="${k}" aria-pressed="${S.fStatus===k}">${l}</button>`).join('')}</div><input type="search" id="q" placeholder="Documento, emitente ou natureza" value="${esc(S.qRaw??S.q)}" aria-label="Buscar notas"></div>`;
+  h+=`<div class="scroll"><table><thead><tr>${th('notas','status','Status')}${th('notas','tipo','Tipo')}${th('notas','doc','Documento')}${th('notas','nome','Emitente')}${th('notas','natop','Natureza da operação')}${th('notas','cfop','CFOP')}${th('notas','emissao','Emissão')}${th('notas','comp','Lançar em')}${th('notas','valor','Valor','num')}${th('notas','tes','TES sugerida')}${th('notas','pontos','Pontos')}${th('notas','seguir','O que seguir')}</tr></thead><tbody>`;
+  if(!list.length)h+=`<tr><td colspan="12" class="empty">${S.notas.length?'Nenhuma nota com esse filtro.':'Nenhuma nota puxada ainda. Peça no chat: “Polenta, puxar o importador”.'}</td></tr>`;
+  for(const n of ordenar('notas',list)){
+    const al=n.alertas||[];const blk=al.some(a=>a.n==='bloqueio');const atAl=al.filter(a=>a.n==='atencao'),at=atAl.filter(a=>!decisaoDe(n,kindDe(a.t))).length,decid=atAl.length>0&&!at;
+    const sel=n.status==='lancada'?`<span class="pill p-done">Lançada</span>`:`<select class="st" data-seq="${esc(n.seq)}" data-v="${esc(n.status)}" aria-label="Status da nota ${esc(n.doc)}"><option value="em_aberto" ${n.status==='em_aberto'?'selected':''}>Em aberto</option><option value="pronta" ${n.status==='pronta'?'selected':''} ${blk?'disabled':''}>Pronta para lançar</option></select>`;
+    const sg=n.sugestao;const dTes=decisaoDe(n,'tes')?.valor;const tes=dTes&&/^\d{3}$/.test(dTes)?`<span class="mono">${esc(dTes)}</span> <span class="pill p-info">Você</span>`:sg?`<span class="mono">${esc(sg.tes)}</span> <span class="pill ${sg.conf>=90?'p-done':'p-warn'}">${sg.conf}%</span>`:'<span class="muted">Sem padrão</span>';
+    const pts=blk?'<span class="pill p-stop">Bloqueio</span>':at?`<span class="pill p-warn">${at} ${at>1?'atenções':'atenção'}</span>`:decid?'<span class="pill p-done">Decidida</span>':'<span class="pill p-info">Sem atenção</span>';
+    h+=`<tr class="row" data-open="${esc(n.seq)}" tabindex="0" aria-expanded="${S.open.has(n.seq)}"><td>${sel}</td><td>${esc(n.tipo)}</td><td class="mono">${esc(n.doc)}${n.serie?' / '+esc(n.serie):''}</td><td class="name">${esc(n.nome)}<div class="muted small mono">${esc(n.forn||'sem código')}${n.loja?' / '+esc(n.loja):''}</div></td><td>${natCell(n)}</td><td>${cfopCell(n)}</td><td>${dt(n.emissao)}</td><td>${(()=>{const l=lancarEm(n);if(!l)return '<span class="pill p-warn">Definir</span>';return n.status!=='lancada'&&l!==(n.emissao||'').slice(0,7)?`<span class="pill p-info" title="Emissão em período fechado">${comp(l)}</span>`:comp(l)})()}</td><td class="num">${money(n.valorTotal)}</td><td style="white-space:nowrap">${tes}</td><td>${pts}${n.baixaFinanceiro?' <span class="pill p-pay">Já paga</span>':''}</td><td>${cellSeguir(n)}</td></tr>`;
+    if(S.open.has(n.seq))h+=`<tr><td colspan="12" class="detail">${detail(n)}</td></tr>`;
+  }
+  h+='</tbody></table></div>';
+  $('v-notas').innerHTML=h;
+  const qEl=$('q');if(qEl&&S.qFocus){qEl.focus();qEl.setSelectionRange(qEl.value.length,qEl.value.length)}
+  if(S.dEdit){const[sq,kk]=S.dEdit.split('|');const de=document.querySelector(`input.dec-txt[data-seq="${sq}"][data-k="${kk}"]`);if(de){de.focus();de.setSelectionRange(de.value.length,de.value.length)}}
+}
+function detail(n){
+  const sg=n.sugestao;let h='<div class="detail-grid">';
+  h+=`<dl class="facts"><div><dt>Natureza da operação no XML</dt><dd>${esc(n.natOp)}</dd></div><div><dt>Natureza financeira</dt><dd>${esc(n.natureza||'A ler na nota')}</dd></div><div><dt>Condição de pagamento</dt><dd>${esc(n.condPag||'A ler na nota (vazia = 009)')}</dd></div><div><dt>IPI / ICMS no XML</dt><dd>${money(n.totalIPI)} / ${money(n.totalICMS)}</dd></div>${sg?`<div><dt>Padrão do fornecedor</dt><dd><span class="mono">${esc(sg.tes)}</span> em ${sg.conf}% de ${sg.hist} linhas${sg.alts?.length?`; também ${esc(sg.alts.join(', '))}`:''}</dd></div><div><dt>Operação da TES</dt><dd>${esc(sg.desc)}</dd></div><div><dt>Centro de custo / conta</dt><dd class="mono">${esc(sg.cc||'sem CC')} / ${esc(sg.conta)}</dd></div>`:''}${n.vencimentoDefinido?`<div><dt>Vencimento definido por você</dt><dd>${dt(n.vencimentoDefinido)}${n.baixaFinanceiro?' <span class="pill p-pay">Já paga: baixar no financeiro</span>':''}</dd></div>`:''}${n.pedidosXml?`<div><dt>Pedidos citados no XML</dt><dd class="mono">${esc(n.pedidosXml)}</dd></div>`:''}${n.chave?`<div><dt>Chave</dt><dd class="mono">${esc(n.chave)}</dd></div>`:''}</dl>`;
+  if(n.alertas?.length)h+=`<ul class="alerts">${n.alertas.map(a=>`<li><span class="pill ${ALERT[a.n][1]}">${ALERT[a.n][0]}</span><span class="txt">${esc(a.t)}</span></li>`).join('')}</ul>`;
+  if(n.itens?.length){
+    const d=(a,b)=>String(a)!==String(b);
+    h+=`<div class="inner"><table><thead><tr><th>Item no XML</th><th>Qtde. e UM no XML</th><th class="num">Unit. XML</th><th class="num">Total</th><th>Na tela: produto</th><th>Tela: qtde. UM</th><th>Tela: TES / CFOP</th><th>Proposta: produto</th><th>Proposta: qtde. UM</th><th class="num">Proposta: unit.</th><th>Proposta: TES / CFOP</th><th>Pedido em aberto</th></tr></thead><tbody>${n.itens.map(i=>{const t=i.tela,s=i.sug;return `<tr><td>${esc(i.xml)}<div class="muted small">${esc(i.xmlDesc)}</div></td><td class="num">${qty(i.qXml)} ${esc(i.umXml)}</td><td class="num">${qty(i.unitXml)}</td><td class="num">${money(i.total)}</td><td class="mono">${esc(t.prod)}<div class="muted small">${esc(t.desc)}</div></td><td class="num">${qty(t.q)} ${esc(t.um)}</td><td class="mono">${esc(t.tes)} / ${esc(t.cfop)}</td><td class="mono ${d(s.prod,t.prod)?'diff':''}">${esc(s.prod)}<div class="muted small">${esc(s.desc)}</div></td><td class="num ${d(s.q,t.q)?'diff':''}">${qty(s.q)} ${esc(s.um)}</td><td class="num ${d(s.unit,t.unit)?'diff':''}">${qty(s.unit)}</td><td class="mono ${d(s.tes,t.tes)?'diff':''}">${esc(s.tes)} / ${esc(s.cfop)}</td><td class="mono">${esc(s.pedido||'A definir')}</td></tr>`}).join('')}</tbody></table></div><p class="small muted">Em vermelho, o que a proposta muda em relação à tela. O total de cada item continua igual ao do XML.</p>`;
+  }else h+='<p class="small muted">Os itens desta nota ainda não foram lidos. Isso acontece ao abrir a nota no importador, antes de lançar.</p>';
+  return h+'</div>';
+}
+
+/* ---------- Lançadas ---------- */
+function fName(f){const x=S.padrao?.fornecedores.find(y=>y.f===f);return x?.nome||''}
+function renderLancadas(){
+  const pl=S.notas.filter(n=>n.status==='lancada').sort((a,b)=>String(b.statusEm||'').localeCompare(String(a.statusEm||'')));let h=tempoBox(pl)+baixaBox(pl)+'<div class="section"><h2>Lançadas por esta plataforma</h2>';
+  if(!pl.length)h+='<div class="scroll"><div class="empty">Nenhuma nota lançada por aqui ainda. Cada nota lançada aparecerá com o comparativo entre XML e Protheus: TES, UM, valores e financeiro.</div></div>';
+  else h+=platTable(pl);
+  h+='</div>';
+  if(!S.hist){h+='<div class="empty">Carregando o histórico…</div>';$('v-lancadas').innerHTML=h;return}
+  const q=S.hq;const list=S.hist.filter(n=>(S.hTipo==='todas'||n.t===S.hTipo)&&(!q||(n.d+' '+n.f+' '+fName(n.f)+' '+n.i.map(i=>i[1]+' '+i[2]+' '+i[7]+' '+i[8]).join(' ')).toLowerCase().casa(q)));
+  h+=`<div class="section"><h2>Histórico do Protheus</h2><p class="small muted">${S.hist.length} notas do arquivo SD1 exportado, com digitação até ${dt(S.hist[0].g)}. O arquivo traz os itens e as retenções, mas não traz o XML nem os títulos a pagar. Por isso, o comparativo com o XML e o financeiro não aparecem nestas notas.</p>
+  <div class="tools"><div class="seg" role="group" aria-label="Filtrar por tipo">${[['todas','Todas'],['N','Normal'],['C','Complemento'],['B','Beneficiamento'],['D','Devolução']].map(([k,l])=>`<button data-ht="${k}" aria-pressed="${S.hTipo===k}">${l}</button>`).join('')}</div><input type="search" id="hq" placeholder="Documento, fornecedor, produto, TES ou CFOP" value="${esc(S.hqRaw??S.hq)}" aria-label="Buscar lançadas"><span class="small muted">${list.length} notas</span></div>
+  <div class="scroll"><table><thead><tr>${th('hist','doc','Documento')}${th('hist','forn','Fornecedor')}${th('hist','tipo','Tipo')}${th('hist','emissao','Emissão')}${th('hist','dig','Digitação')}${th('hist','itens','Itens','num')}${th('hist','total','Total itens','num')}${th('hist','tes','TES')}${th('hist','um','UM')}${th('hist','ret','Retenções')}</tr></thead><tbody>`;
+  for(const n of ordenar('hist',list).slice(0,S.hLim)){const k=n.f+n.l+n.d+n.s;const tes=[...new Set(n.i.map(i=>i[7]))],um=[...new Set(n.i.map(i=>i[3]))];
+    h+=`<tr class="row" data-hopen="${esc(k)}" tabindex="0" aria-expanded="${S.hOpen.has(k)}"><td class="mono">${esc(n.d)}${n.s?' / '+esc(n.s):''}</td><td><span class="mono">${esc(n.f)}/${esc(n.l)}</span> <span class="small">${esc(fName(n.f))}</span></td><td>${esc(TIPO[n.t]||n.t)}</td><td>${dt(n.e)}</td><td>${dt(n.g)}</td><td class="num">${n.i.length}</td><td class="num">${money(n.v)}</td><td class="mono">${esc(tes.join(', '))}</td><td>${esc(um.join(', '))}</td><td>${Object.keys(n.r).length?`<span class="pill p-info">${Object.keys(n.r).map(x=>RET[x]).join(', ')}</span>`:''}</td></tr>`;
+    if(S.hOpen.has(k))h+=`<tr><td colspan="10" class="detail">${histDetail(n)}</td></tr>`;
+  }
+  if(!list.length)h+='<tr><td colspan="10" class="empty">Nenhuma nota com esse filtro.</td></tr>';
+  h+='</tbody></table></div>';
+  if(list.length>S.hLim)h+='<button class="act more" id="hMore">Mostrar mais 40</button>';
+  h+='</div>';
+  $('v-lancadas').innerHTML=h;
+  const e=$('hq');if(e&&S.hFocus){e.focus();e.setSelectionRange(e.value.length,e.value.length)}
+}
+function fmtTempo(seg){if(!(seg>0))return '–';seg=Math.round(seg);const h=Math.floor(seg/3600),m=Math.floor(seg%3600/60),s=seg%60;return h?`${h}h${String(m).padStart(2,'0')}`:`${m}m${String(s).padStart(2,'0')}`}
+function tempoBox(pl){
+  const med=pl.filter(n=>n.tempoSeg>0);if(!med.length)return '';
+  const tot=med.reduce((a,n)=>a+n.tempoSeg,0);const man=+S.tempo?.minutosManual||0;
+  const eco=man?man*60*med.length-tot:null;
+  return `<div class="timebox"><div><div class="big">${eco===null?'–':(eco<0?'-':'')+fmtTempo(Math.abs(eco))}</div><div class="small muted">Tempo economizado</div></div><div><div class="val">${fmtTempo(tot)}</div><div class="small muted">Tempo do Polenta em ${med.length} nota${med.length===1?'':'s'}</div></div><div><div class="val">${fmtTempo(tot/med.length)}</div><div class="small muted">Média por nota</div></div><label><input type="number" id="minManual" min="0" step="1" inputmode="numeric" value="${man||''}" placeholder="min" aria-label="Minutos para lançar uma nota manualmente"><span class="small muted">Minutos por nota no manual</span></label>${man?'':'<p class="small muted">Informe o tempo manual para calcular a economia.</p>'}</div>`;
+}
+function platTable(pl){
+  let h=`<div class="scroll"><table><thead><tr>${th('plat','doc','Documento')}${th('plat','nome','Emitente')}${th('plat','natop','Natureza da operação')}${th('plat','emissao','Emissão')}${th('plat','data','Lançada em')}${th('plat','valor','Valor','num')}${th('plat','tes','TES')}${th('plat','cfop','CFOP')}${th('plat','tempo','Tempo','num')}</tr></thead><tbody>`;
+  for(const n of ordenar('plat',pl)){const k=n.seq,l=n.lancamento||{},tes=[...new Set((l.itens||[]).map(i=>i.tes).filter(Boolean))];
+    h+=`<tr class="row" data-popen="${esc(k)}" tabindex="0" aria-expanded="${S.pOpen.has(k)}"><td class="mono">${esc(n.doc)}${n.serie?' / '+esc(n.serie):''}${n.baixaFinanceiro?' <span class="pill p-pay">Já paga</span>':''}</td><td>${esc(n.nome)}</td><td>${natCell(n)}</td><td>${dt(n.emissao)}</td><td>${dt(l.data)}</td><td class="num">${money(n.valorTotal)}</td><td class="mono">${esc(tes.join(', '))}</td><td>${cfopCell(n)}</td><td class="num">${n.tempoSeg>0?fmtTempo(n.tempoSeg):`<span class="muted"${n.tempoNota?` title="${esc(n.tempoNota)}"`:''}>–</span>`}</td></tr>`;
+    if(S.pOpen.has(k))h+=`<tr><td colspan="9" class="detail">${platCard(n)}</td></tr>`;
+  }
+  return h+'</tbody></table></div>';
+}
+function baixaBox(pl){
+  const lanc=pl.filter(n=>n.baixaFinanceiro);const fila=S.notas.filter(n=>n.baixaFinanceiro&&n.status!=='lancada').length;
+  if(!lanc.length&&!fila)return '';
+  const tot=lanc.reduce((a,n)=>a+(+n.valorTotal||0),0);
+  S.baixaTxt=lanc.map(n=>[n.doc+(n.serie?'/'+n.serie:''),n.nome,'R$ '+money(n.valorTotal),'venc. '+dt(n.vencimentoDefinido)].join(' - ')).join('\n');
+  return `<div class="paybox"><div class="tools" style="justify-content:space-between"><div><h2>Para o financeiro baixar</h2><p class="small muted">Notas já pagas. ${lanc.length} lançada${lanc.length===1?'':'s'}, R$ ${money(tot)}${fila?`; ${fila} ainda não lançada${fila===1?'':'s'}`:''}.</p></div>${lanc.length?'<button class="act" id="copyBaixa">Copiar a lista</button>':''}</div>${lanc.length?`<div class="inner"><table><thead><tr><th>Documento</th><th>Emitente</th><th class="num">Valor</th><th>Vencimento</th><th>Situação</th></tr></thead><tbody>${lanc.map(n=>`<tr><td class="mono">${esc(n.doc)}${n.serie?' / '+esc(n.serie):''}</td><td>${esc(n.nome)}</td><td class="num">${money(n.valorTotal)}</td><td>${dt(n.vencimentoDefinido)}</td><td><span class="pill p-pay">Já paga: baixar</span></td></tr>`).join('')}</tbody></table></div>`:''}</div>`;
+}
+function histDetail(n){
+  let h=`<div class="detail-grid"><div class="inner"><table><thead><tr><th>Item</th><th>Produto</th><th>UM</th><th class="num">Qtde.</th><th class="num">Unit.</th><th class="num">Total</th><th>TES</th><th>CFOP</th><th>CST</th><th class="num">ICMS</th><th class="num">IPI</th><th>CC</th><th>Conta</th><th>Arm.</th><th>Pedido</th></tr></thead><tbody>${n.i.map(i=>`<tr><td>${esc(i[0])}</td><td class="mono">${esc(i[1])}<div class="muted small">${esc(i[2])}</div></td><td>${esc(i[3])}</td><td class="num">${qty(i[4])}</td><td class="num">${qty(i[5])}</td><td class="num">${money(i[6])}</td><td class="mono">${esc(i[7])}</td><td class="mono">${esc(i[8])}</td><td class="mono">${esc(i[9])}</td><td class="num">${money(i[10])}</td><td class="num">${money(i[11])}</td><td class="mono">${esc(i[12])}</td><td class="mono">${esc(i[13])}</td><td class="mono">${esc(i[14])}</td><td class="mono">${esc(i[15])}${i[16]?' / '+esc(i[16]):''}</td></tr>`).join('')}</tbody></table></div>`;
+  const r=Object.entries(n.r);
+  h+=`<dl class="facts"><div><dt>Retenções</dt><dd>${r.length?r.map(([k,v])=>RET[k]+' '+money(v)).join(' · '):'Nenhuma no SD1'}</dd></div><div><dt>Títulos a pagar</dt><dd class="muted">Não constam neste arquivo</dd></div><div><dt>Comparativo com XML</dt><dd class="muted">XML não disponível no histórico</dd></div></dl></div>`;
+  return h;
+}
+function platCard(n){
+  const l=n.lancamento||{};const its=l.itens||[];const row=(lb,x,p)=>{const dif=String(x??'')!==String(p??'');return `<tr><td>${esc(lb)}</td><td class="mono">${esc(x??'')}</td><td class="mono ${dif?'diff':''}">${esc(p??'')}</td><td>${dif?'<span class="pill p-stop">Diferente</span>':'<span class="pill p-done">Confere</span>'}</td></tr>`};
+  const c=l.comparativo||[];
+  return `<div class="scroll"><div style="padding:12px 14px;display:grid;gap:10px"><div class="tools" style="justify-content:space-between"><h3>${esc(n.doc)}${n.serie?' / '+esc(n.serie):''} · ${esc(n.nome)}${n.baixaFinanceiro?' <span class="pill p-pay">Já paga: baixar no financeiro</span>':''}</h3><span class="small muted">Lançada em ${dt(l.data)}${l.dataBase?`, data-base ${dt(l.dataBase)}`:''}</span></div>
+  ${c.length?`<div class="inner"><table><thead><tr><th>Campo</th><th>XML</th><th>Protheus</th><th>Resultado</th></tr></thead><tbody>${c.map(x=>row(x.campo,x.xml,x.protheus)).join('')}</tbody></table></div>`:''}
+  ${its.length?`<div class="inner"><table><thead><tr><th>Produto</th><th>UM</th><th class="num">Qtde.</th><th class="num">Unit.</th><th class="num">Total</th><th>TES</th><th>CFOP</th><th>Pedido</th></tr></thead><tbody>${its.map(i=>`<tr><td class="mono">${esc(i.prod)}<div class="muted small">${esc(i.desc)}</div></td><td>${esc(i.um)}</td><td class="num">${qty(i.q)}</td><td class="num">${qty(i.unit)}</td><td class="num">${money(i.total)}</td><td class="mono">${esc(i.tes)}</td><td class="mono">${esc(i.cfop)}</td><td class="mono">${esc(i.pedido||'')}</td></tr>`).join('')}</tbody></table></div>`:''}
+  ${l.financeiro?.length?`<div class="inner"><table><thead><tr><th>Parcela</th><th>Vencimento no XML</th><th>Vencimento no Protheus</th><th class="num">Valor no XML</th><th class="num">Valor no Protheus</th></tr></thead><tbody>${l.financeiro.map(f=>`<tr><td>${esc(f.parcela)}</td><td>${dt(f.vencXml)}</td><td class="${f.vencXml!==f.venc?'diff':''}">${dt(f.venc)}</td><td class="num">${money(f.valorXml)}</td><td class="num ${f.valorXml!==f.valor?'diff':''}">${money(f.valor)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="small muted">Financeiro ainda não registrado para esta nota.</p>'}</div></div>`;
+}
+
+/* ---------- Padrão ---------- */
+function renderPadrao(){
+  const P=S.padrao;if(!P){$('v-padrao').innerHTML='<div class="empty">Carregando o padrão…</div>';return}
+  const m=P.meta,H=m.holdout;const pct=(H.acertos/H.linhas*100).toFixed(1).replace('.',',');
+  const you=[['Pedido de compra','Sempre verificar em <b>Ped. Compra</b> e amarrar cada item ao pedido em aberto. A quantidade pode ficar acima ou abaixo do pedido. O valor unitário deve bater, com diferença só por causa da unidade de medida.'],['Serviços (TES 091)','Sempre verificar se há pedido. Se não houver, a nota segue sem pedido.'],['Retenções','Quando o XML trouxer PIS, COFINS e CSLL, preencher nos itens as bases com o valor da nota e depois os valores de cada imposto. Em Impostos, usar o código de retenção <b>1708</b> para IRRF e <b>5952</b> para PIS, COFINS e CSLL.'],['Impostos sem histórico','Sempre seguir o histórico de lançamentos. Se o imposto não aparece no histórico do fornecedor, zerar no item.'],['Conta e centro de custo','Conta iniciada em 412 usa centro de custo iniciado em 2 (ex.: 20100). Conta 413 usa centro de custo iniciado em 11 (ex.: 11100). Conta 414 usa 13001. Para trocar, deixar um único centro de custo no importador, confirmar e alterar a conta no Documento de Entrada, pela pesquisa do campo.'],['Notas de posto','Sem pedido, produto 0304030. Adenilson: conta 4120404 e CC 22001. Cesar: conta 4130509 e CC 11100. Marcos: conta 4140403 e CC 13001. Sem nome: conta 4120404 e CC 22001. Vencimento no dia 19 do mês seguinte ao da emissão.'],['Avisos do sistema','Em Código de ISS, CEST do Produto e Pedido de Compra, clicar sempre em Continuar.'],['Unidade de medida','Sempre converter para unidade ou peça. Quando for peso, sempre para kg. O total do item continua igual ao do XML.'],['Uso e consumo (código 90)','Em regra, itens com produto iniciado em 90 são de uso e consumo. Não alterar a unidade: seguir o histórico de notas lançadas.'],['Condição de pagamento','Sem condição informada, usar <b>009</b>.'],['Data de lançamento','Segue o período aberto, no botão do topo. Notas emitidas até o fim do mês aberto, mesmo as de meses anteriores, entram nesse mês. As emitidas depois entram no mês da emissão.'],['Pré-nota','Nunca lançar como pré-nota. Sempre direto no documento de entrada.'],['Bolinha verde','No importador, indica nota para lançamento.'],['Fidelidade ao XML','TES, UM e financeiro devem seguir o XML. Toda nota lançada entra no comparativo.'],['Quando parar','Lançar as notas marcadas como prontas sem perguntar a cada passo. Parar e perguntar só diante de algo novo.']];
+  const hist=[['Escolha da TES',`Fornecedor + produto, depois produto, depois fornecedor. Sem correspondência, a nota fica sem sugestão.`],['CFOP','A TES define os três últimos dígitos, sem exceção no histórico. O primeiro vem da origem: 1 para o mesmo estado, 2 para outro estado.'],['UM e armazém',`Seguem o produto: mesma UM em ${String(m.umProduto).replace('.',',')}% das linhas e mesmo armazém em ${String(m.armProduto).replace('.',',')}%.`],['Identificação da nota','Sempre por emitente + documento + série. O número sozinho se repete entre emitentes.'],['Mês de lançamento',`${m.mesmoMes} de ${m.notas} notas foram digitadas no mês da emissão, ${m.mesSeguinte} no mês seguinte e ${m.doisMeses} dois meses depois.`]];
+  let h=regrasBox()+`<div class="section"><h2>Regras gerais</h2><div class="rules">${you.map(([t,x])=>`<div class="rule"><span class="src you">Você definiu</span><h3>${t}</h3><p>${x}</p></div>`).join('')}${hist.map(([t,x])=>`<div class="rule"><span class="src">Visto no histórico</span><h3>${t}</h3><p>${x}</p></div>`).join('')}</div></div>`;
+  h+=`<div class="section"><h2>Quanto o padrão acerta</h2><p>Treinei o padrão com as linhas digitadas até ${dt(H.corte)} e usei-o para prever a TES das ${H.linhas} linhas seguintes: <b>${H.acertos} acertos (${pct}%)</b>. Por isso, a TES é uma sugestão que você confere, nunca uma decisão automática.</p>
+  <div class="scroll"><table><thead><tr><th>Regra usada</th><th class="num">Linhas</th><th class="num">Acertos</th><th class="num">Taxa</th></tr></thead><tbody><tr><td>Fornecedor + produto</td><td class="num">${H.parN}</td><td class="num">${H.parOk}</td><td class="num">${Math.round(H.parOk/H.parN*100)}%</td></tr><tr><td>Só produto (fornecedor novo para o item)</td><td class="num">${H.prodN}</td><td class="num">${H.prodOk}</td><td class="num">${Math.round(H.prodOk/H.prodN*100)}%</td></tr><tr><td>Só fornecedor (produto novo)</td><td class="num">${H.fornN}</td><td class="num">${H.fornOk}</td><td class="num">${Math.round(H.fornOk/H.fornN*100)}%</td></tr><tr><td>Sem sugestão</td><td class="num">${H.semSugestao}</td><td class="num">–</td><td class="num">–</td></tr></tbody></table></div></div>`;
+  h+=`<div class="section"><h2>Decisões que faltam</h2><ol class="decide"><li><b>Unidades que não são peça nem peso:</b> o histórico tem LT, MT, FD, CX, CT e GL em 142 linhas, nenhuma em produto iniciado em 90. Litro e metro continuam como estão? Fardo e caixa viram unidade?</li><li><b>Notas de novembro:</b> posso trocar a data-base da sessão para novembro ao lançar essas notas? Em qual data?</li><li><b>Dados que faltam:</b> o CSV não traz natureza e condição (SF1), títulos (SE2), nomes de fornecedores (SA2) nem a descrição das TES (SF4). Exportar essas tabelas completa o padrão e a aba Lançadas.</li></ol></div>`;
+  h+=`<div class="section"><h2>TES usadas</h2><p class="small muted">A operação vem da descrição oficial do CFOP, não do cadastro da TES. Confira quando exportar a SF4.</p><div class="scroll"><table><thead><tr>${th('tes','tes','TES')}${th('tes','desc','Operação pelo CFOP')}${th('tes','cfop','CFOP')}${th('tes','tipo','Tipo de nota')}${th('tes','linhas','Linhas','num')}${th('tes','pedido','Com pedido','num')}${th('tes','icms','Com ICMS','num')}${th('tes','ipi','Com IPI','num')}${th('tes','cc','Com CC','num')}${th('tes','arm','Armazém')}</tr></thead><tbody>${ordenar('tes',P.tes).map(t=>`<tr><td class="mono">${esc(t.tes)}</td><td>${esc(t.desc)}</td><td class="mono">${esc(t.cfops.join(', '))}</td><td>${esc(t.tipo.map(x=>TIPO[x]||x).join(', '))}</td><td class="num">${t.linhas}</td><td class="num">${t.pedido}%</td><td class="num">${t.icms}%</td><td class="num">${t.ipi}%</td><td class="num">${t.cc}%</td><td class="mono">${esc(t.arm.join(', '))}</td></tr>`).join('')}</tbody></table></div></div>`;
+  const q=S.fq;const fl=P.fornecedores.filter(f=>!q||(f.f+' '+f.nome+' '+f.pares.map(p=>p.p+' '+p.d).join(' ')+' '+f.tes.map(t=>t[0]).join(' ')).toLowerCase().casa(q)).sort((a,b)=>b.linhas-a.linhas);
+  h+=`<div class="section"><h2>Padrão por fornecedor e produto</h2><div class="tools"><input type="search" id="fq" placeholder="Fornecedor, produto ou TES" value="${esc(S.fqRaw??S.fq)}" aria-label="Buscar no padrão"><span class="small muted">${fl.length} fornecedores</span></div><div class="scroll"><table><thead><tr>${th('forn','nome','Fornecedor')}${th('forn','notas','Notas','num')}${th('forn','linhas','Linhas','num')}${th('forn','tes','TES')}${th('forn','conf','Na TES principal','num')}${th('forn','ped','Com pedido','num')}${th('forn','cc','CC principal')}${th('forn','conta','Conta principal')}${th('forn','ret','Retenções')}</tr></thead><tbody>`;
+  for(const f of ordenar('forn',fl).slice(0,S.fLim)){h+=`<tr class="row" data-fopen="${esc(f.f)}" tabindex="0" aria-expanded="${S.fOpen.has(f.f)}"><td><span class="mono">${esc(f.f)}</span> <span class="small">${esc(f.nome)}</span></td><td class="num">${f.notas}</td><td class="num">${f.linhas}</td><td class="mono">${f.tes.map(t=>esc(t[0])).join(', ')}</td><td class="num"><span class="pill ${f.conf>=90?'p-done':'p-warn'}">${f.conf}%</span></td><td class="num">${f.ped}%</td><td class="mono">${esc(f.cc[0]?.[0]||'')}</td><td class="mono">${esc(f.conta[0]?.[0]||'')}</td><td>${f.ret.map(x=>RET[x]).join(', ')}</td></tr>`;
+    if(S.fOpen.has(f.f))h+=`<tr><td colspan="9" class="detail"><div class="inner"><table><thead><tr><th>Produto</th><th>UM</th><th class="num">Linhas</th><th>TES (vezes)</th><th>CFOP</th><th>CC</th><th>Conta</th><th>Arm.</th></tr></thead><tbody>${f.pares.map(p=>`<tr><td class="mono">${esc(p.p)}<div class="muted small">${esc(p.d)}</div></td><td>${esc(p.um)}</td><td class="num">${p.n}</td><td class="mono">${p.tes.map(t=>esc(t[0])+' ('+t[1]+')').join(', ')}</td><td class="mono">${esc(p.cf)}</td><td class="mono">${esc(p.cc)}</td><td class="mono">${esc(p.ct)}</td><td class="mono">${esc(p.a)}</td></tr>`).join('')}</tbody></table></div></td></tr>`}
+  if(!fl.length)h+='<tr><td colspan="9" class="empty">Nenhum fornecedor com esse filtro.</td></tr>';
+  h+='</tbody></table></div>';
+  if(fl.length>S.fLim)h+='<button class="act more" id="fMore">Mostrar mais 30</button>';
+  h+=`<p class="small muted">Base: ${m.linhas} linhas, ${m.notas} notas, ${m.fornecedores} fornecedores e ${m.produtos} produtos, com emissão de ${dt(m.emisDe)} a ${dt(m.emisAte)}. Arquivo: ${esc(m.arquivo)}.</p></div>`;
+  $('v-padrao').innerHTML=h;
+  const e=$('fq');if(e&&S.fFocus){e.focus();e.setSelectionRange(e.value.length,e.value.length)}
+}
+
+/* ---------- Eventos ---------- */
+function renderAll(){renderNotas();renderEntrada();renderLancadas();renderPadrao();route()}
+document.addEventListener('change',async e=>{const t=e.target,sq=t.dataset?.seq,k=t.dataset?.k;if(!sq||!k)return;
+  if(t.matches('.dec-sel')){if(t.value==='__txt'){S.dEdit=sq+'|'+k;renderNotas();return}await salvaDec(sq,k,t.value)}
+  else if(t.matches('.dec-esc')){const n=S.notas.find(x=>x.seq===sq);await salvaDec(sq,k,n?.decisoes?.[k]?.valor,t.value)}
+  else if(t.matches('.dec-txt')){const key=sq+'|'+k;delete S.dDraft[key];if(S.dEdit===key)S.dEdit=null;await salvaDec(sq,k,t.value)}
+});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches?.('.dec-txt'))e.target.blur()});
+document.addEventListener('keydown',e=>{const pm=$('polMenu');
+  if(pm&&!pm.hidden){if(e.key==='Escape'){e.preventDefault();fechaMenu(true)}
+    else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const it=[...pm.querySelectorAll('button')],i=it.indexOf(document.activeElement);it[(i+(e.key==='ArrowDown'?1:-1)+it.length)%it.length].focus()}
+    return}
+  if(e.key==='Escape'&&S.polChamado){S.polChamado=false;S.polModo='normal';renderPolenta();$('polChamar')?.focus()}});
+document.addEventListener('change',async e=>{if(e.target.id!=='minManual')return;
+  const v=Math.max(0,Math.round(+e.target.value||0));if(!S.db){toast('Sem conexão com a base. Não foi possível salvar.');return}
+  try{await S.db.doc('meta/tempo').set({minutosManual:v});toast('Tempo manual salvo.')}catch{toast('Não foi possível salvar o tempo manual.');renderLancadas()}
+});
+document.addEventListener('change',async e=>{const t=e.target;if(!t.matches('select.st'))return;
+  const seq=t.dataset.seq,v=t.value;
+  const n=S.notas.find(x=>x.seq===seq);
+  if(!S.db){toast('Não foi possível salvar nesta visualização.');renderNotas();return}
+  if(v==='pronta'&&n?.alertas?.some(a=>a.n==='bloqueio')){toast('Esta nota tem bloqueio e não pode ficar pronta.');renderNotas();return}
+  try{await S.db.doc('notas/'+seq).update({status:v,statusEm:new Date().toISOString()});toast(v==='pronta'?`Nota ${n?.doc} marcada como pronta.`:`Nota ${n?.doc} voltou para em aberto.`)}
+  catch(err){toast('O status não foi salvo. Tente novamente.');renderNotas()}
+});
+document.addEventListener('click',async e=>{
+  const t=e.target;
+  if(t.closest('select,input'))return;
+  const et=t.closest('[data-et]');if(et){S.eTipo=et.dataset.et;renderEntrada();return}
+  const es=t.closest('[data-es]');if(es){S.eSt=es.dataset.es;renderEntrada();return}
+  const so=t.closest('button.sort');if(so){clicaSort(so.dataset.st,so.dataset.sk);return}
+  const f=t.closest('[data-f]');if(f){S.fStatus=f.dataset.f;renderNotas();return}
+  const ht=t.closest('[data-ht]');if(ht){S.hTipo=ht.dataset.ht;S.hLim=40;renderLancadas();return}
+  if(t.closest('#perBtn')){S.perOpen=!S.perOpen;counts();renderPeriodo();$('perBtn')?.focus();return}
+  if(t.id==='perFechar'){const a=mesAberto();if(a)await mudaPeriodo(a,`${comp(a)} fechado. O período aberto agora é ${comp(somaMes(a,1))}.`);return}
+  if(t.id==='perReabrir'){const f=S.periodos?.fechadoAte;if(f)await mudaPeriodo(somaMes(f,-1),`${comp(f)} reaberto.`);return}
+  const rd=t.closest('[data-rdel]');if(rd){try{await S.db.doc('regras/'+rd.dataset.rdel).delete();toast('Regra removida.')}catch{toast('A regra não foi removida. Tente novamente.')}return}
+  if(t.id==='hMore'){S.hLim+=40;renderLancadas();return}
+  if(t.id==='fMore'){S.fLim+=30;renderPadrao();return}
+  if(t.id==='copyBaixa'){try{await navigator.clipboard.writeText(S.baixaTxt||'');toast('Lista copiada.')}catch{toast('Não foi possível copiar. Selecione a tabela e copie.')}return}
+  if(t.id==='copyCmd'){try{await navigator.clipboard.writeText('Polenta, lançar as notas prontas');toast('Pedido copiado.')}catch{toast('Copie o texto: Polenta, lançar as notas prontas')}return}
+  toggleRow(t.closest('tr.row'));
+});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('tr.row')){e.preventDefault();toggleRow(e.target)}});
+function toggleRow(r){if(!r)return;
+  if(r.dataset.open){const k=r.dataset.open;(()=>{const x=S.open.has(k);S.open.clear();if(!x)S.open.add(k)})();renderNotas()}
+  else if(r.dataset.hopen){const k=r.dataset.hopen;(()=>{const x=S.hOpen.has(k);S.hOpen.clear();if(!x)S.hOpen.add(k)})();renderLancadas()}
+  else if(r.dataset.eopen){const k=r.dataset.eopen;(()=>{const x=S.eOpen.has(k);S.eOpen.clear();if(!x)S.eOpen.add(k)})();renderEntrada()}
+  else if(r.dataset.popen){const k=r.dataset.popen;(()=>{const x=S.pOpen.has(k);S.pOpen.clear();if(!x)S.pOpen.add(k)})();renderLancadas()}
+  else if(r.dataset.fopen){const k=r.dataset.fopen;(()=>{const x=S.fOpen.has(k);S.fOpen.clear();if(!x)S.fOpen.add(k)})();renderPadrao()}
+}
+document.addEventListener('input',e=>{const t=e.target;
+  if(t.id==='q'){S.qRaw=t.value;S.q=t.value.trim().toLowerCase();S.qFocus=true;renderNotas()}
+  if(t.id==='hq'){S.hqRaw=t.value;S.hq=t.value.trim().toLowerCase();S.hFocus=true;S.hLim=40;renderLancadas()}
+  if(t.id==='fq'){S.fqRaw=t.value;S.fq=t.value.trim().toLowerCase();S.fFocus=true;S.fLim=30;renderPadrao()}
+  if(t.id==='eq'){S.eqRaw=t.value;S.eq=t.value.trim().toLowerCase();renderEntrada()}
+  if(t.matches('.dec-txt')){const key=t.dataset.seq+'|'+t.dataset.k;S.dDraft[key]=t.value;S.dEdit=key}
+});
+document.addEventListener('focusout',e=>{if(e.target.matches?.('.dec-txt')){const key=e.target.dataset.seq+'|'+e.target.dataset.k;if(S.dEdit===key&&S.dDraft[key]===undefined)S.dEdit=null}if(e.target.id==='q')S.qFocus=false;if(e.target.id==='hq')S.hFocus=false;if(e.target.id==='fq')S.fFocus=false});
+
+
+/* ---------- Mascote ---------- */
+/* meta/polenta: {estado:'trabalhando'|'concluido'|'parado', texto, atual, total, em}. Sem sinal há 30 minutos, some. */
+function renderPolenta(){
+  const el=$('pol');if(!el)return;const m=S.polenta;const idade=m?.em?Date.now()-Date.parse(m.em):Infinity;
+  const ativo=!!(m&&((m.estado==='trabalhando'&&idade<30*60e3)||(m.estado==='concluido'&&idade<3*60e3)));
+  const bt=$('polChamar');if(bt)bt.setAttribute('aria-pressed',String(!!S.polChamado));
+  const ver=ativo||!!S.polChamado;
+  el.hidden=!ver;document.body.classList.toggle('pol-on',ver);if(!ver)return;
+  el.classList.toggle('min',!!S.polMin);
+  el.classList.toggle('estudo',S.polModo==='estudo');
+  if(S.polModo==='estudo'){$('polTxt').innerHTML=S.polAnalise||'<b>Analisando as notas…</b>Folheando o importador, as regras e o histórico.';return}
+  if(ativo&&!S.polChamado){
+    const prog=m.estado==='trabalhando'&&m.total>0?`<span class="muted small">Nota ${m.atual||1} de ${m.total}</span>`:'';
+    $('polTxt').innerHTML=`<b>${m.estado==='concluido'?'Pronto!':'Polenta trabalhando'}</b>${esc(m.texto||'')}${prog?'<br>'+prog:''}`;
+    return;
+  }
+  const pr=S.notas.filter(n=>n.status==='pronta'),tot=pr.reduce((a,n)=>a+(+n.valorTotal||0),0);
+  const pend=S.notas.filter(n=>n.status!=='lancada'&&pontosDe(n).some(k=>!decisaoDe(n,k))).length;
+  const linhas=[];
+  if(ativo)linhas.push(`${m.estado==='concluido'?'Acabei agora':'Agora estou'}: ${esc(m.texto||'')}`);
+  linhas.push(pr.length?`${pr.length} nota${pr.length===1?' pronta':'s prontas'} para lançar, R$ ${money(tot)}.`:'Nenhuma nota pronta para lançar.');
+  if(pend)linhas.push(`${pend} nota${pend===1?' tem ponto':'s têm pontos'} de atenção sem decisão.`);
+  if(mesAberto())linhas.push(`Período aberto: ${comp(mesAberto())}.`);
+  linhas.push(pr.length?'Para eu lançar, peça no chat: <b style="display:inline;font:inherit;font-weight:600">“Polenta, lançar as notas prontas”</b>.':'Marque notas como prontas e me chame no chat.');
+  $('polTxt').innerHTML=`<b>Oi! Estou por aqui.</b>${linhas.join('<br>')}<div class="acoes">${pr.length?'<button type="button" id="polCopy">Copiar o pedido</button>':''}<button type="button" id="polAnalisar">Analisar</button></div>`;
+}
+function polAnim(cls,ms){const el=$('pol');if(!el)return;
+  el.classList.remove(cls);void el.offsetWidth;el.classList.add(cls);clearTimeout(polAnim[cls]);polAnim[cls]=setTimeout(()=>el.classList.remove(cls),ms)}
+function analiseNotas(){
+  const ab=S.notas.filter(n=>n.status!=='lancada'),a=mesAberto(),pr=ab.filter(n=>n.status==='pronta').length;
+  const cont={};ab.forEach(n=>pontosDe(n).forEach(k=>{if(!decisaoDe(n,k))cont[k]=(cont[k]||0)+1}));
+  const bloq=ab.filter(n=>(n.alertas||[]).some(x=>x.n==='bloqueio')).length;
+  const fech=a?ab.filter(n=>n.emissao&&n.emissao.slice(0,7)<a).length:0;
+  const dep=a?ab.filter(n=>{const l=lancarEm(n);return l&&l>a}).length:0;
+  const semSug=ab.filter(n=>!n.sugestao&&!decisaoDe(n,'tes')&&!(n.alertas||[]).some(x=>x.n==='bloqueio')).length;
+  const mai=[...ab].sort((x,y)=>(+y.valorTotal||0)-(+x.valorTotal||0))[0];
+  const L=[`${ab.length} nota${ab.length===1?'':'s'} em aberto${pr?`, ${pr} pronta${pr===1?'':'s'}`:''}.`];
+  const pts=Object.entries(cont).map(([k,v])=>`${KIND[k]} ${v}`).join(', ');if(pts)L.push(`Pontos sem decisão: ${pts}.`);
+  if(bloq)L.push(`${bloq} com bloqueio, a resolver no Protheus.`);
+  if(fech)L.push(`${fech} de meses fechados ${fech===1?'entra':'entram'} em ${comp(a)}.`);
+  if(dep)L.push(`${dep} ${dep===1?'fica':'ficam'} para depois de ${comp(a)}.`);
+  if(semSug)L.push(`${semSug} sem TES sugerida nem decisão.`);
+  if(mai)L.push(`Maior valor em aberto: R$ ${money(mai.valorTotal)}, ${esc(mai.nome||'')} (${esc(mai.doc)}).`);
+  return `<b>Análise das notas</b>${L.join('<br>')}<div class="acoes"><button type="button" id="polVolta">Voltar</button></div>`;
+}
+function polAnalisar(){S.polChamado=true;S.polMin=false;S.polModo='estudo';S.polAnalise=null;renderPolenta();
+  clearTimeout(S.polT);S.polT=setTimeout(()=>{if(S.polModo==='estudo'){S.polAnalise=analiseNotas();renderPolenta()}},2600)}
+function abreMenu(x,y){const m=$('polMenu'),b=$('polBtn');if(!m||!b)return;m.hidden=false;const r=b.getBoundingClientRect();
+  if(!x&&!y){x=r.left;y=r.top}const w=m.offsetWidth,h=m.offsetHeight;
+  m.style.left=Math.max(8,Math.min(x-w/2,innerWidth-w-8))+'px';m.style.top=Math.max(8,Math.min(y-h-6,innerHeight-h-8))+'px';m.querySelector('button').focus()}
+function fechaMenu(foco){const m=$('polMenu');if(!m||m.hidden)return;m.hidden=true;if(foco)$('polBtn')?.focus()}
+document.addEventListener('contextmenu',e=>{if(!e.target.closest('#polBtn'))return;e.preventDefault();abreMenu(e.clientX,e.clientY)});
+document.addEventListener('focusin',e=>{if(!e.target.closest('#polMenu'))fechaMenu(false)});
+document.addEventListener('click',async e=>{
+  if(!e.target.closest('#polMenu'))fechaMenu(false);
+  const pi=e.target.closest('[data-pol]');
+  if(pi){fechaMenu(true);const a=pi.dataset.pol;
+    if(a==='analisar')polAnalisar();
+    else if(a==='dancar'){S.polModo='normal';renderPolenta();polAnim('danca',1800)}
+    else{S.polChamado=false;S.polModo='normal';S.polMin=true;renderPolenta();$('polChamar')?.focus()}
+    return}
+  if(e.target.closest('#polChamar')){S.polChamado=!S.polChamado;S.polMin=false;S.polModo='normal';renderPolenta();if(S.polChamado)polAnim('chega',1400);return}
+  if(e.target.closest('#polAnalisar')){polAnalisar();return}
+  if(e.target.closest('#polVolta')){S.polModo='normal';renderPolenta();return}
+  if(e.target.closest('#polCopy')){try{await navigator.clipboard.writeText('Polenta, lançar as notas prontas');toast('Pedido copiado.')}catch{toast('Copie o texto: Polenta, lançar as notas prontas')}return}
+  if(e.target.closest('#polMin')){S.polModo='normal';if(S.polChamado){S.polChamado=false;$('polChamar')?.focus()}else S.polMin=true;renderPolenta();return}
+  if(e.target.closest('#polBtn')){S.polMin=!S.polMin;renderPolenta();if(S.polModo!=='estudo')polAnim('danca',1800);return}
+});
+setInterval(renderPolenta,60e3);
+
+
+/* ---------- Entrada de Notas ---------- */
+/* Status do recebimento, separado do status de lançamento: aberto, recebida, lancada. Nota lançada pelo Polenta já conta como lançada. */
+const ENT={aberto:'Em aberto',recebida:'Recebida',lancada:'Lançada'};
+const TIPOS_ENT=['NF-e','NFS-e','CT-e'];
+const entradaDe=n=>n.status==='lancada'||n.sincErp?'lancada':(ENT[n.entrada?.status]?n.entrada.status:'aberto');
+function itensDe(n){
+  if(n.itens?.length)return n.itens.map(i=>({xml:i.xml,xmlDesc:i.xmlDesc,prod:i.tela?.prod||i.sug?.prod||'',desc:i.tela?.desc||i.sug?.desc||'',q:i.qXml,um:i.umXml,unit:i.unitXml,total:i.total,ncm:i.ncm,cfopXml:i.cfopXml||'',tes:i.tela?.tes||'',cfop:i.tela?.cfop||''}));
+  return (n.lancamento?.itens||[]).filter(i=>i.prod||i.desc).map(i=>({xml:'',xmlDesc:'',prod:i.prod,desc:i.desc,q:i.q,um:i.um,unit:i.unit,total:i.total,ncm:'',tes:i.tes,cfop:i.cfop}));
+}
+function entDetalhe(n){
+  const it=itensDe(n);
+  if(n.nfsVinculadas?.length&&!it.length)return `<div class="inner"><table><thead><tr><th>NF de saída vinculada ao CT-e</th><th>Série</th><th>Cliente</th></tr></thead><tbody>${n.nfsVinculadas.map(v=>`<tr><td class="mono">${esc(v.num)}</td><td>${esc(v.serie)}</td><td class="mono">${esc(v.cliente)}</td></tr>`).join('')}</tbody></table></div>`;
+  if(!it.length)return '<p class="small muted">Os produtos desta nota ainda não foram lidos. O Polenta lê os produtos quando abre a nota no importador.</p>';
+  return `<div class="inner"><table><thead><tr><th>Item no XML</th><th>Produto</th><th class="num">Qtde.</th><th>UM</th><th class="num">Unit.</th><th class="num">Total</th><th>NCM</th><th>CFOP do XML</th><th>TES / CFOP</th></tr></thead><tbody>${it.map(i=>`<tr><td>${i.xml?`<span class="mono">${esc(i.xml)}</span>`:''}<div class="muted small">${esc(i.xmlDesc||'')}</div></td><td class="mono">${esc(i.prod)}<div class="muted small">${esc(i.desc)}</div></td><td class="num">${qty(i.q)}</td><td>${esc(i.um||'')}</td><td class="num">${qty(i.unit)}</td><td class="num">${money(i.total)}</td><td class="mono">${esc(i.ncm||'')}</td><td class="mono">${esc(i.cfopXml||'')}</td><td class="mono">${esc([i.tes,i.cfop].filter(Boolean).join(' / '))}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function renderEntrada(){
+  const box=$('v-entrada');if(!box)return;
+  if(S.dbState==='loading'&&!S.notas.length){box.innerHTML='<div class="empty">Carregando as notas do importador…</div>';return}
+  if(S.dbState==='off'){box.innerHTML='<div class="empty">Não foi possível acessar as notas nesta visualização. Abra a página com sua conta do Claude.</div>';return}
+  const TODAS=S.notasTodas||S.notas;const doTipo=TODAS.filter(n=>n.tipo===S.eTipo);
+  const cont=t=>TODAS.filter(n=>n.tipo===t).length;
+  const cst=k=>doTipo.filter(n=>k==='todas'||entradaDe(n)===k).length;
+  const q=S.eq;const list=doTipo.filter(n=>(S.eSt==='todas'||entradaDe(n)===S.eSt)&&(!q||[n.doc,n.nome,n.forn,n.natOp,n.serie].join(' ').toLowerCase().casa(q)));
+  let h=`<div class="tools" style="justify-content:space-between"><div><h2>Entrada de Notas Fiscais</h2></div></div>
+  <nav class="tabs" aria-label="Tipo de documento">${TIPOS_ENT.map(t=>`<a href="#entrada" data-et="${t}" ${S.eTipo===t?'aria-current="page"':''}>${t} <span class="muted small">${cont(t)}</span></a>`).join('')}</nav>
+  <div class="tools"><div class="seg" role="group" aria-label="Filtrar por status de entrada">${[['todas','Todas'],['aberto','Em aberto'],['recebida','Recebidas'],['lancada','Lançadas']].map(([k,l])=>`<button data-es="${k}" aria-pressed="${S.eSt===k}">${l} <span class="small">${cst(k)}</span></button>`).join('')}</div><input type="search" id="eq" placeholder="Documento, emitente ou natureza" value="${esc(S.eqRaw??'')}" aria-label="Buscar na entrada de notas"></div>
+  <div class="scroll"><table><thead><tr>${th('ent','doc','Documento')}${th('ent','nome','Emitente')}${th('ent','emissao','Emissão')}${th('ent','natop','Natureza da operação')}${th('ent','valor','Valor','num')}${th('ent','itens','Itens','num')}${th('ent','st','Status','stcol')}</tr></thead><tbody>`;
+  if(!list.length)h+=`<tr><td colspan="7" class="empty">${doTipo.length?'Nenhuma nota com esse filtro.':'Nenhuma '+esc(S.eTipo)+' no importador.'}</td></tr>`;
+  for(const n of ordenar('ent',list)){
+    const st=entradaDe(n),it=itensDe(n).length,auto=n.status==='lancada'||n.sincErp;
+    const ctrl=auto?`<span class="pill p-done" title="Lançada pelo Polenta">Lançada</span>`:`<select class="ent" data-seq="${esc(n.seq)}" data-v="${st}" aria-label="Status de entrada da nota ${esc(n.doc)}">${Object.entries(ENT).map(([k,l])=>`<option value="${k}" ${st===k?'selected':''}>${l}</option>`).join('')}</select>`;
+    h+=`<tr class="row" data-eopen="${esc(n.seq)}" tabindex="0" aria-expanded="${S.eOpen.has(n.seq)}"><td class="mono">${esc(n.doc)}${n.serie?' / '+esc(n.serie):''}${n.sincErp&&n.status!=='lancada'?`<div><span class="pill p-done" title="O Qive mostra esta nota como sincronizada no ERP">No ERP</span></div>`:''}${n.cancelada?`<div><span class="pill p-stop">Cancelada</span></div>`:''}${n.foraDoImportador&&n.status!=='lancada'?`<div><span class="pill p-open" title="Não estava mais no importador em ${dt(n.foraDoImportador)}">Saiu do importador</span></div>`:''}</td><td class="name">${esc(n.nome)}</td><td>${dt(n.emissao)}</td><td>${natCell(n)}</td><td class="num">${money(n.valorTotal)}</td><td class="num">${it||'<span class="muted">–</span>'}</td><td class="stcol">${ctrl}</td></tr>`;
+    if(S.eOpen.has(n.seq))h+=`<tr><td colspan="7" class="detail">${entDetalhe(n)}</td></tr>`;
+  }
+  box.innerHTML=h+'</tbody></table></div>';
+}
+document.addEventListener('change',async e=>{const t=e.target;if(!t.matches('select.ent'))return;
+  const seq=t.dataset.seq,v=t.value,n=(S.notasTodas||S.notas).find(x=>x.seq===seq);
+  if(!S.db){toast('Sem conexão com a base. O status não foi salvo.');renderEntrada();return}
+  try{await S.db.doc('notas/'+seq).update({entrada:{status:v,em:new Date().toISOString()}});toast(`Nota ${n?.doc||''}: ${ENT[v]}.`)}
+  catch{toast('O status não foi salvo. Tente novamente.');renderEntrada()}
+});
+/* Mantém o foco e a posição do cursor nos campos de busca quando a tela é redesenhada. */
+function comFoco(fn){return function(...a){const ae=document.activeElement,id=ae&&ae.id&&ae.matches?.('input,textarea')?ae.id:null,ss=id?ae.selectionStart:0,se=id?ae.selectionEnd:0;
+  const r=fn.apply(this,a);
+  if(id){const nv=document.getElementById(id);if(nv&&nv!==ae&&document.activeElement!==nv){nv.focus();try{nv.setSelectionRange(ss,se)}catch{}}}
+  return r}}
+renderNotas=comFoco(renderNotas);renderEntrada=comFoco(renderEntrada);renderLancadas=comFoco(renderLancadas);renderPadrao=comFoco(renderPadrao);
+
+/* ---------- Dados ---------- */
+async function loadFiles(){
+  try{S.padrao=await (await fetch('padrao.json')).json();renderPadrao();renderLancadas();renderNotas()}catch{$('v-padrao').innerHTML='<div class="empty">Não foi possível carregar o padrão. Recarregue a página.</div>'}
+  try{S.hist=await (await fetch('historico.json')).json();renderLancadas()}catch{S.hist=[];}
+}
+iniciaAcesso();
+async function loadDb(){
+  const db=await (window.claude?.use?window.claude.use('db'):Promise.resolve(null)).catch(()=>null);
+  if(!db){S.dbState='off';renderNotas();return}
+  S.db=db;
+  const tm=setTimeout(()=>{if(S.dbState==='loading'){S.dbState='slow';renderNotas()}},10000);
+  db.collection('notas').onSnapshot(s=>{S.notasBrutas=s.docs.map(d=>({seq:d.id,...d.data()}));aplicaQive();if(!s.metadata.fromCache){clearTimeout(tm);S.dbState='ok'}else if(S.dbState==='loading')S.dbState='cache';renderNotas();renderEntrada();renderLancadas()},()=>{clearTimeout(tm);S.dbState='off';renderNotas()});
+  db.doc('meta/importador').onSnapshot(s=>{S.meta=s.exists?s.data():null;renderNotas()},()=>{});
+  db.collection('qiveStatus').onSnapshot(s=>{S.qiveStatus=s.docs.map(d=>d.data());aplicaQive();renderNotas();renderEntrada();renderLancadas()},()=>{});
+  db.collection('qiveRodadas').onSnapshot(s=>{S.qiveRodadas=s.docs.map(d=>d.data());renderNotas()},()=>{});
+  db.collection('regras').onSnapshot(s=>{const r={};s.docs.forEach(d=>r[d.id]=d.data());S.regras=r;renderNotas();renderPadrao()},()=>{});
+  db.doc('meta/polenta').onSnapshot(s=>{const o=S.polenta;S.polenta=s.exists?s.data():null;if(o?.em!==S.polenta?.em&&S.polenta?.estado!==o?.estado)S.polMin=false;renderPolenta()},()=>{});
+  db.doc('meta/periodos').onSnapshot(s=>{S.periodos=s.exists?s.data():null;renderNotas();renderPeriodo()},()=>{});
+  db.doc('meta/tempo').onSnapshot(s=>{S.tempo=s.exists?s.data():null;renderLancadas()},()=>{});
+}
+renderAll();loadFiles();loadDb();
+</script>
+<script src="modulos.js"></script>
+</body></html>
