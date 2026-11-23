@@ -176,6 +176,11 @@ function renderFaturamento(){
    MC = preço − impostos − custo − frete; MC % sobre o preço. Sem estrutura ou com custo incompleto: fora da MC média.
    Pedidos do Chai (23/11/2026): sem comissão, sem textos explicativos, no máximo 2 casas, % ao lado do valor, tabela inteira numa tela, gaveta lateral. */
 const FPV_GRUPOS=[['todos','Todos'],...PRINCIPAIS,['outros','Outros clientes']];
+/* Ordem das colunas: código em ordem numérica (9 antes de 10); códigos com letra depois dos numéricos (pedido do Chai, 23/11/2026). */
+const fpvNum=c=>/^[\d.\-]+$/.test(c);
+function fpvOrdem(a,b){const x=String(a.cod),y=String(b.cod),nx=fpvNum(x),ny=fpvNum(y);
+  if(nx&&ny){const d=BigInt(x.replace(/\D/g,'')||0)-BigInt(y.replace(/\D/g,'')||0);return d<0n?-1:d>0n?1:COLL.compare(x,y)}
+  if(nx!==ny)return nx?-1:1;return COLL.compare(x,y)}
 /* Produtos fora da Formação de preço (pedido do Chai, 23/11/2026). */
 const FPV_FORA=new Set(['9090001']);
 const vazio=v=>v===undefined||v===null||v==='';
@@ -219,7 +224,7 @@ function renderFpVenda(){
   if(!fatLinhas()||!M.dados.estruturas||!rotLinhas()||!M.dados.entradas){box.innerHTML=esperando('Carregando faturamento, estruturas, roteiro e entradas…');Promise.all([carregar('faturamento'),carregar('estruturas'),carregar('roteiro'),carregar('entradas')]).then(()=>{if(M.atual==='fpvenda')renderFpVenda()}).catch(()=>box.innerHTML=esperando('Não foi possível carregar os dados.'));return}
   const p=fpvPrem(),gr=ui('fpv_grupo','todos'),q=ui('b_fpv',''),so=ui('fpv_custo','todos'),op=ui('fpv_op','todas'),exp=ui('fpv_exp',()=>new Set());
   const todas=fpvLinhas().map(o=>fpvCalc(o,p));
-  const R=todas.filter(r=>(gr==='todos'||r.grupo===gr)&&(so==='todos'||(so==='ok'?r.st==='ok':r.st!=='ok'))&&(op==='todas'||(op==='indust')===r.indust)&&casa(`${r.cod} ${r.desc} ${[...r.cli.keys()].join(' ')}`,q)).sort((a,b)=>b.fat-a.fat);
+  const R=todas.filter(r=>(gr==='todos'||r.grupo===gr)&&(so==='todos'||(so==='ok'?r.st==='ok':r.st!=='ok'))&&(op==='todas'||(op==='indust')===r.indust)&&casa(`${r.cod} ${r.desc} ${[...r.cli.keys()].join(' ')}`,q)).sort(fpvOrdem);
   const ok=R.filter(r=>r.st==='ok'),fatOk=ok.reduce((a,r)=>a+r.fat,0),fatT=R.reduce((a,r)=>a+r.fat,0);
   const mcPond=fatOk?ok.reduce((a,r)=>a+r.mcp*r.fat,0)/fatOk:null,mcSimp=ok.length?ok.reduce((a,r)=>a+r.mcp,0)/ok.length:null;
   M._fpvExport=()=>R;
