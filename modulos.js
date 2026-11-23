@@ -225,6 +225,8 @@ function renderFpVenda(){
   const pc=v=>isFinite(v)?(v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}).replace('-','−')+'%':'–';
   const pc2=v=>(+v||0).toLocaleString('pt-BR',{maximumFractionDigits:2})+'%';
   const v2=v=>Math.abs(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  /* Preço de venda com 3 casas (pedido do Chai, 23/11/2026); os demais valores com 2. */
+  const v3=v=>Math.abs(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:3,maximumFractionDigits:3});
   const cor=v=>v===null?'':v<0?' neg':' pos';
   const pin=(k,l)=>`<label class="fpv-pin"><span>${l}</span><span class="pct-in"><input class="custo" type="text" inputmode="decimal" id="fpvp_${k}" data-fpvprem="${k}" value="${String(p[k]).replace('.',',')}" aria-label="${l} em %"${p.modo==='xml'&&['icms','pis','cofins'].includes(k)?' disabled':''}> %</span></label>`;
   let h=`<div class="tools fpv-topo"><div class="seg" role="group" aria-label="Grupo de clientes">${FPV_GRUPOS.map(([k,l])=>`<button type="button" data-uiset="fpv_grupo" data-v="${k}" aria-pressed="${gr===k}">${esc(l)}</button>`).join('')}</div>
@@ -245,7 +247,7 @@ function renderFpVenda(){
   const status=r=>r.st==='ok'?'':r.st==='sem'?'<span class="pill p-stop">Sem custo</span>':`<span class="pill p-warn" title="${esc(r.motivos.join(' · '))}">Parcial</span>`;
   const qd=ui('fpv_q',null);
   let t=`<div class="fpv-wrap"><table class="fpv"><thead><tr><th class="fpv-rot fpv-canto">Produto</th>${R.map(r=>`<th class="fpv-prod" scope="col"><div class="fpv-cab"><span class="fpv-ic" aria-hidden="true">${ini(r.desc)}</span><b title="${esc(r.desc)}">${esc(r.desc)}</b></div><small class="mono" title="${esc([...r.cli.keys()].join(', '))}">${esc(r.cod)}</small><span class="fpv-tags">${r.indust?'<span class="pill p-info" title="Mais da metade do valor em CFOP x124/x125. O material que o cliente envia (remessa x901) não entra no custo.">Industrialização</span>':''}${status(r)}</span></th>`).join('')}</tr></thead><tbody>`;
-  t+=lin('Preço de venda',(r,i)=>`<td class="num fpv-preco"><input class="custo${r.sim?' manual':''}" type="text" inputmode="decimal" id="fpvpr_${i}" data-fpvpreco="${esc(r.cod)}" value="${v2(r.preco)}" title="Preço médio faturado: ${v2(r.pm)} · ${num(r.q,0)} ${esc((r.un||'').toLowerCase())}" aria-label="Preço de venda de ${esc(r.desc)}">${r.sim?`<button type="button" class="fpv-lk" data-fpvlimpa="${esc(r.cod)}" title="Voltar ao preço médio faturado (${v2(r.pm)})" aria-label="Voltar ao preço médio">↺</button>`:''}</td>`,'fpv-l-preco');
+  t+=lin('Preço de venda',(r,i)=>`<td class="num fpv-preco"><input class="custo${r.sim?' manual':''}" type="text" inputmode="decimal" id="fpvpr_${i}" data-fpvpreco="${esc(r.cod)}" value="${v3(r.preco)}" title="Preço médio faturado: ${v3(r.pm)} · ${num(r.q,0)} ${esc((r.un||'').toLowerCase())}" aria-label="Preço de venda de ${esc(r.desc)}">${r.sim?`<button type="button" class="fpv-lk" data-fpvlimpa="${esc(r.cod)}" title="Voltar ao preço médio faturado (${v3(r.pm)})" aria-label="Voltar ao preço médio">↺</button>`:''}</td>`,'fpv-l-preco');
   t+=lin(`${tg('imp','(−) Impostos')} <span class="fpv-pp">${p.modo==='xml'?'notas':pc((p.icms+(100-p.icms)*(p.pis+p.cofins)/100)/100)}</span>`,r=>val(r.imp,r.preco,{neg:1}));
   if(exp.has('imp'))t+=lin('ICMS',r=>val(r.icms,r.preco,{neg:1}),'fpv-sub')+lin('PIS',r=>val(r.pis,r.preco,{neg:1}),'fpv-sub')+lin('COFINS',r=>val(r.cof,r.preco,{neg:1}),'fpv-sub');
   t+=lin('(=) Preço líquido',r=>val(r.liq,r.preco),'fpv-forte');
@@ -278,8 +280,8 @@ function renderFpVenda(){
   box.innerHTML=h+t;
 }
 function exportaFpv(){const R=M._fpvExport&&M._fpvExport();if(!R)return;
-  const C=[['Código',r=>r.cod],['Descrição',r=>r.desc],['Cliente principal',r=>r.cliP],['Operação',r=>r.indust?'Industrialização':'Venda'],['Situação do custo',r=>r.st==='ok'?'Completo':r.st==='sem'?'Sem custo':'Parcial: '+r.motivos.join(', ')],['Qtd. período',r=>r.q],['Faturamento período',r=>r.fat],['Preço médio',r=>r.pm],['Preço de venda',r=>r.preco],['ICMS',r=>r.icms],['PIS',r=>r.pis],['COFINS',r=>r.cof],['Impostos',r=>r.imp],['Preço líquido',r=>r.liq],['Matéria-prima',r=>r.mp],['Custo injeção',r=>r.inj],['Embalagem',r=>r.emb],['Outros insumos',r=>r.ins],['Custo do produto',r=>r.custo],['Frete',r=>r.frete],['Total custos',r=>r.tot],['MC R$',r=>r.st==='sem'?'':r.mc],['MC %',r=>r.st==='sem'?'':Math.round(r.mcp*1000)/10]];
-  const cel=v=>typeof v==='number'?String(Math.round(v*100)/100).replace('.',','):'"'+String(v??'').replace(/"/g,'""')+'"';
+  const C=[['Código',r=>r.cod],['Descrição',r=>r.desc],['Cliente principal',r=>r.cliP],['Operação',r=>r.indust?'Industrialização':'Venda'],['Situação do custo',r=>r.st==='ok'?'Completo':r.st==='sem'?'Sem custo':'Parcial: '+r.motivos.join(', ')],['Qtd. período',r=>r.q],['Faturamento período',r=>r.fat],['Preço médio',r=>({n:r.pm,d:3})],['Preço de venda',r=>({n:r.preco,d:3})],['ICMS',r=>r.icms],['PIS',r=>r.pis],['COFINS',r=>r.cof],['Impostos',r=>r.imp],['Preço líquido',r=>r.liq],['Matéria-prima',r=>r.mp],['Custo injeção',r=>r.inj],['Embalagem',r=>r.emb],['Outros insumos',r=>r.ins],['Custo do produto',r=>r.custo],['Frete',r=>r.frete],['Total custos',r=>r.tot],['MC R$',r=>r.st==='sem'?'':r.mc],['MC %',r=>r.st==='sem'?'':Math.round(r.mcp*1000)/10]];
+  const cel=v=>v&&typeof v==='object'?v.n.toFixed(v.d).replace('.',','):typeof v==='number'?String(Math.round(v*100)/100).replace('.',','):'"'+String(v??'').replace(/"/g,'""')+'"';
   const lin=[C.map(c=>c[0]).join(';'),...R.map(r=>C.map(c=>cel(c[1](r))).join(';'))];
   baixaCsv('formacao-preco-mc.csv',String.fromCharCode(65279)+lin.join(String.fromCharCode(13,10)))}
 
