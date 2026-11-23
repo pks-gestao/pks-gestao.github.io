@@ -167,22 +167,28 @@ function renderFaturamento(){
 
 /* ---------- Faturamento › Formação de preço: margem de contribuição por produto (modelo da Formação de Preço do Gestão Vaeso, pedido do Chai, 23/11/2026) ----------
    Preço = preço médio faturado no período (CFOPs de receita) ou o preço digitado para simular (formacao/<cod>.precoSim).
-   Custo = ficha da Estruturas › Formação de preço: matéria-prima (kg), outros insumos, injeção (roteiro × R$ 70/h) e embalagem.
-   Impostos, frete e comissão: premissas em config/fpvenda. ICMS por dentro do preço; PIS e COFINS sobre (preço − ICMS); frete e comissão sobre o preço.
-   MC = preço − impostos − custo − frete − comissão; MC % sobre o preço. Produto sem estrutura ou com custo incompleto fica fora da MC média. */
+   Custo = ficha da Estruturas › Formação de preço: matéria-prima (kg), injeção (roteiro × R$ 70/h), embalagem e outros insumos.
+   Industrialização (mais da metade do valor em x124/x125): o material que o cliente envia (entradas x901) sai do custo.
+   Impostos e frete: premissas em config/fpvenda. ICMS por dentro do preço; PIS e COFINS sobre (preço − ICMS); frete sobre o preço.
+   MC = preço − impostos − custo − frete; MC % sobre o preço. Sem estrutura ou com custo incompleto: fora da MC média.
+   Ajustes do Chai (23/11/2026): sem comissão, sem textos explicativos, no máximo 2 casas, % ao lado do valor, linhas baixas, sem cliente no cabeçalho. */
 const FPV_GRUPOS=[['todos','Todos'],...PRINCIPAIS,['outros','Outros clientes']];
-function fpvPrem(){const c=M.fpv||{},d={icms:12,pis:1.65,cofins:7.6,frete:+cfg().fretePct||0,comissao:+cfg().comissaoPct||0,modo:'prem'};const o={};for(const k in d)o[k]=c[k]===undefined||c[k]===null||c[k]===''?d[k]:c[k];return o}
+function fpvPrem(){const c=M.fpv||{},d={icms:12,pis:1.65,cofins:7.6,frete:+cfg().fretePct||0,modo:'prem'};const o={};for(const k in d)o[k]=c[k]===undefined||c[k]===null||c[k]===''?d[k]:c[k];return o}
+/* Material do cliente: produtos das entradas com CFOP 1901/2901 (remessa para industrialização). */
+function materialCliente(){if(M._fpvCli)return M._fpvCli;const j=M.dados.entradas,s=new Set();if(!j)return s;
+  const iC=j.colunas.indexOf('Cod. Fiscal'),iP=j.colunas.indexOf('Produto');for(const r of j.linhas)if(['1901','2901'].includes(String(r[iC])))s.add(String(r[iP]).trim());return M._fpvCli=s}
 function fpvLinhas(){
   const g=new Map();
   for(const l of fatLinhas()){if(tipoCfop(l.cfop).t!=='Receita'||!noPeriodo('fpv',l.data))continue;
     const o=g.get(l.cod)||{cod:l.cod,desc:l.desc,un:l.un,q:0,fat:0,icms:0,pis:0,cofins:0,ind:0,cli:new Map()};
     o.q+=l.q;o.fat+=l.total;o.icms+=l.icms;o.pis+=l.pis;o.cofins+=l.cofins;if(['124','125'].includes(String(l.cfop).slice(1)))o.ind+=l.total;o.cli.set(l.destNome,(o.cli.get(l.destNome)||0)+l.total);g.set(l.cod,o)}
   return [...g.values()].filter(o=>o.q>0&&o.fat>0).map(o=>{const cp=[...o.cli].sort((a,b)=>b[1]-a[1])[0][0];const pr=PRINCIPAIS.find(([k])=>cp.toUpperCase().includes(k));
-    return {...o,cliP:cp,grupo:pr?pr[0]:'outros',grupoNome:pr?pr[1]:cp.split(/[\s,.\/-]+/)[0],vae:[...o.cli.keys()].every(ehVaeso),indust:o.ind>o.fat/2}});
+    return {...o,cliP:cp,grupo:pr?pr[0]:'outros',vae:[...o.cli.keys()].every(ehVaeso),indust:o.ind>o.fat/2}});
 }
 function fpvCalc(o,p){
-  const f=ficha(o.cod,o.vae);let mp=0,ins=0;
-  for(const g of f.grupos)for(const l of g.linhas)if(l.val!==null){if(l.um==='KG')mp+=l.val;else ins+=l.val}
+  const f=ficha(o.cod,o.vae,o.indust?materialCliente():null);let mp=0,ins=0;const mps=[];
+  for(const g of f.grupos)for(const l of g.linhas){if(l.um==='KG')mps.push({desc:descDe(l.mp),g:l.q*1000,unit:l.unit,val:l.val,cl:l.cl,zv:l.zv});if(l.val!==null){if(l.um==='KG')mp+=l.val;else ins+=l.val}}
+  const inj=formacao(o.cod,o.vae).inj.filter(r=>r.injeta);
   const custo=mp+ins+f.vInj+f.vEmb;
   const motivos=[];if(f.temE){if(f.falta)motivos.push(f.falta+' item'+(f.falta===1?'':'s')+' sem custo');if(!f.vInj)motivos.push('sem roteiro de injeção')}
   const st=!f.temE?'sem':motivos.length?'parcial':'ok';
@@ -190,12 +196,12 @@ function fpvCalc(o,p){
   let icms,pis,cof;
   if(p.modo==='xml'){icms=preco*o.icms/o.fat;pis=preco*o.pis/o.fat;cof=preco*o.cofins/o.fat}
   else{icms=preco*p.icms/100;pis=(preco-icms)*p.pis/100;cof=(preco-icms)*p.cofins/100}
-  const imp=icms+pis+cof,liq=preco-imp,frete=preco*p.frete/100,com=preco*p.comissao/100,tot=custo+frete+com,mc=liq-tot;
-  return {...o,f,mp,ins,inj:f.vInj,emb:f.vEmb,custo,st,motivos,pm,sim,preco,icms,pis,cof,imp,liq,frete,com,tot,mc,mcp:preco?mc/preco:0};
+  const imp=icms+pis+cof,liq=preco-imp,frete=preco*p.frete/100,tot=custo+frete,mc=liq-tot;
+  return {...o,f,mps,injs:inj,mp,ins,inj:f.vInj,emb:f.vEmb,embIns:f.vEmb+ins,custo,st,motivos,pm,sim,preco,icms,pis,cof,imp,liq,frete,tot,mc,mcp:preco?mc/preco:0};
 }
 function renderFpVenda(){
   const box=$('v-fpvenda');
-  if(!fatLinhas()||!M.dados.estruturas||!rotLinhas()){box.innerHTML=esperando('Carregando faturamento, estruturas e roteiro…');Promise.all([carregar('faturamento'),carregar('estruturas'),carregar('roteiro')]).then(()=>{if(M.atual==='fpvenda')renderFpVenda()}).catch(()=>box.innerHTML=esperando('Não foi possível carregar os dados.'));return}
+  if(!fatLinhas()||!M.dados.estruturas||!rotLinhas()||!M.dados.entradas){box.innerHTML=esperando('Carregando faturamento, estruturas, roteiro e entradas…');Promise.all([carregar('faturamento'),carregar('estruturas'),carregar('roteiro'),carregar('entradas')]).then(()=>{if(M.atual==='fpvenda')renderFpVenda()}).catch(()=>box.innerHTML=esperando('Não foi possível carregar os dados.'));return}
   const p=fpvPrem(),gr=ui('fpv_grupo','todos'),q=ui('b_fpv',''),so=ui('fpv_custo','todos'),op=ui('fpv_op','todas'),exp=ui('fpv_exp',()=>new Set());
   const todas=fpvLinhas().map(o=>fpvCalc(o,p));
   const R=todas.filter(r=>(gr==='todos'||r.grupo===gr)&&(so==='todos'||(so==='ok'?r.st==='ok':r.st!=='ok'))&&(op==='todas'||(op==='indust')===r.indust)&&casa(`${r.cod} ${r.desc} ${[...r.cli.keys()].join(' ')}`,q)).sort((a,b)=>b.fat-a.fat);
@@ -203,8 +209,6 @@ function renderFpVenda(){
   const mcPond=fatOk?ok.reduce((a,r)=>a+r.mcp*r.fat,0)/fatOk:null,mcSimp=ok.length?ok.reduce((a,r)=>a+r.mcp,0)/ok.length:null;
   M._fpvExport=()=>R;
   const pc=v=>isFinite(v)?(v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}).replace('-','−')+'%':'–';
-  /* Preço abaixo de R$ 1: valores por peça com 4 casas (como na ficha da Estruturas); demais, 2 casas. */
-  const rs=(v,P)=>Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:P<1?4:2,maximumFractionDigits:P<1?4:2});
   const pc2=v=>(+v||0).toLocaleString('pt-BR',{maximumFractionDigits:2})+'%';
   const cor=v=>v===null?'':v<0?' neg':' pos';
   const pin=(k,l)=>`<label class="fpv-pin"><span>${l}</span><span class="pct-in"><input class="custo" type="text" inputmode="decimal" id="fpvp_${k}" data-fpvprem="${k}" value="${String(p[k]).replace('.',',')}" aria-label="${l} em %"${p.modo==='xml'&&['icms','pis','cofins'].includes(k)?' disabled':''}> %</span></label>`;
@@ -214,34 +218,40 @@ function renderFpVenda(){
   <div class="cards3 fpv-kpis"><div class="card-k verde"><span>MC média ponderada</span><b class="${cor(mcPond)}">${mcPond===null?'–':pc(mcPond)}</b><small class="muted">Pelo faturamento do período · média simples <b>${mcSimp===null?'–':pc(mcSimp)}</b></small></div>
   <div class="card-k"><span>Faturamento do período</span><b>${brl0(fatT)}</b><small class="muted">${esc(perTexto(ui('per_fpv',()=>({}))))} · ${R.length} produto${R.length===1?'':'s'}</small></div>
   <div class="card-k"><span>Produtos com custo completo</span><b>${ok.length} de ${R.length}</b><small class="muted">${brl0(fatOk)} do faturamento entra na MC média</small></div></div>
-  <details class="fpv-prem"${ui('fpv_premab',false)?' open':''}><summary>Premissas <span class="small muted">ICMS ${p.modo==='xml'?'das notas':pc2(p.icms)} · PIS ${p.modo==='xml'?'das notas':pc2(p.pis)} · COFINS ${p.modo==='xml'?'das notas':pc2(p.cofins)} · Frete ${pc2(p.frete)} · Comissão ${pc2(p.comissao)}</span></summary>
+  <details class="fpv-prem"${ui('fpv_premab',false)?' open':''}><summary>Premissas <span class="small muted">ICMS ${p.modo==='xml'?'das notas':pc2(p.icms)} · PIS ${p.modo==='xml'?'das notas':pc2(p.pis)} · COFINS ${p.modo==='xml'?'das notas':pc2(p.cofins)} · Frete ${pc2(p.frete)}</span></summary>
   <div class="fpv-prem-in"><div class="seg" role="group" aria-label="Impostos">${[['prem','Impostos pelas premissas'],['xml','Impostos das notas (XML)']].map(([k,l])=>`<button type="button" data-fpvmodo="${k}" aria-pressed="${p.modo===k}">${l}</button>`).join('')}</div>
-  ${pin('icms','ICMS')}${pin('pis','PIS')}${pin('cofins','COFINS')}${pin('frete','Frete s/ vendas')}${pin('comissao','Comissão')}</div>
-  <p class="small muted">ICMS por dentro do preço; PIS e COFINS sobre o preço menos o ICMS; frete e comissão sobre o preço. Em "Impostos das notas", cada produto usa o ICMS, PIS e COFINS que saíram nas notas do período, em % do valor. Valem para todos os produtos e ficam salvas.</p></details>`;
+  ${pin('icms','ICMS')}${pin('pis','PIS')}${pin('cofins','COFINS')}${pin('frete','Frete s/ vendas')}</div></details>`;
   if(!R.length){box.innerHTML=h+esperando('Nenhum produto faturado com esse filtro.');return}
-  const val=(v,P,o={})=>`<td class="num${o.cls||''}"><span class="fpv-v">${o.neg&&v>0?'−':''}${rs(v,P)}</span><small>${pc(P?v/P:NaN)}</small></td>`;
-  const semC=r=>`<td class="num fpv-semc"><span>${r.st==='sem'?'Sem custo':'–'}</span></td>`;
+  const v2=v=>Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const val=(v,P,o={})=>`<td class="num${o.cls||''}"><span class="fpv-v">${o.neg&&v>0.005?'−':''}${v2(v)}</span><small>${pc(P?v/P:NaN)}</small></td>`;
+  const semC=r=>`<td class="num fpv-semc">${r.st==='sem'?'Sem custo':'–'}</td>`;
   const tg=(k,l)=>`<button type="button" class="fpv-tg" data-fpvexp="${k}" aria-expanded="${exp.has(k)}"><i aria-hidden="true">${exp.has(k)?'▾':'▸'}</i>${l}</button>`;
   const lin=(rot,cel,cls='')=>`<tr class="${cls}"><th scope="row" class="fpv-rot">${rot}</th>${R.map(cel).join('')}</tr>`;
+  const qd=ui('fpv_q',null);
   const ini=d=>esc(String(d||'').replace(/[^A-Za-zÀ-ú0-9 ]/g,' ').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?');
   const status=r=>r.st==='ok'?'':r.st==='sem'?'<span class="pill p-stop">Sem custo</span>':`<span class="pill p-warn" title="${esc(r.motivos.join(' · '))}">Parcial</span>`;
-  let t=`<div class="fpv-wrap"><table class="fpv"><thead><tr><th class="fpv-rot fpv-canto">Produto</th>${R.map(r=>`<th class="fpv-prod" scope="col"><span class="fpv-ic" aria-hidden="true">${ini(r.desc)}</span><b title="${esc(r.desc)}">${esc(r.desc)}</b><small class="mono">${esc(r.cod)}</small><small title="${esc(r.cliP)}">${esc(r.grupoNome)}</small><span class="fpv-tags">${r.indust?'<span class="pill p-info" title="Mais da metade do valor em CFOP x124/x125">Industrialização</span>':''}${r.vae?'<span class="pill p-info" title="Caixa e master sem custo">Vaeso</span>':''}${status(r)}</span></th>`).join('')}</tr></thead><tbody>`;
-  t+=lin('Preço de venda',(r,i)=>`<td class="num fpv-preco"><input class="custo${r.sim?' manual':''}" type="text" inputmode="decimal" id="fpvpr_${i}" data-fpvpreco="${esc(r.cod)}" value="${rs(r.preco,r.preco)}" aria-label="Preço de venda de ${esc(r.desc)}"><small>${r.sim?`médio ${rs(r.pm,r.pm)} <button type="button" class="fpv-lk" data-fpvlimpa="${esc(r.cod)}" title="Voltar ao preço médio faturado">voltar</button>`:`médio · ${num(r.q,0)} ${esc((r.un||'').toLowerCase())}`}</small></td>`,'fpv-l-preco');
+  let t=`<div class="fpv-wrap"><table class="fpv"><thead><tr><th class="fpv-rot fpv-canto">Produto</th>${R.map(r=>`<th class="fpv-prod" scope="col"><div class="fpv-cab"><span class="fpv-ic" aria-hidden="true">${ini(r.desc)}</span><b title="${esc(r.desc)}">${esc(r.desc)}</b></div><small class="mono" title="${esc([...r.cli.keys()].join(', '))}">${esc(r.cod)}</small><span class="fpv-tags">${r.indust?'<span class="pill p-info" title="Mais da metade do valor em CFOP x124/x125. O material que o cliente envia (remessa x901) não entra no custo.">Industrialização</span>':''}${status(r)}</span></th>`).join('')}</tr></thead><tbody>`;
+  t+=lin('Preço de venda',(r,i)=>`<td class="num fpv-preco"><input class="custo${r.sim?' manual':''}" type="text" inputmode="decimal" id="fpvpr_${i}" data-fpvpreco="${esc(r.cod)}" value="${v2(r.preco)}" title="Preço médio faturado: ${v2(r.pm)} · ${num(r.q,0)} ${esc((r.un||'').toLowerCase())}" aria-label="Preço de venda de ${esc(r.desc)}">${r.sim?`<button type="button" class="fpv-lk" data-fpvlimpa="${esc(r.cod)}" title="Voltar ao preço médio faturado (${v2(r.pm)})" aria-label="Voltar ao preço médio">↺</button>`:''}</td>`,'fpv-l-preco');
   t+=lin(`${tg('imp','(−) Impostos')} <span class="fpv-pp">${p.modo==='xml'?'notas':pc((p.icms+(100-p.icms)*(p.pis+p.cofins)/100)/100)}</span>`,r=>val(r.imp,r.preco,{neg:1}));
   if(exp.has('imp'))t+=lin('ICMS',r=>val(r.icms,r.preco,{neg:1}),'fpv-sub')+lin('PIS',r=>val(r.pis,r.preco,{neg:1}),'fpv-sub')+lin('COFINS',r=>val(r.cof,r.preco,{neg:1}),'fpv-sub');
   t+=lin('(=) Preço líquido',r=>val(r.liq,r.preco),'fpv-forte');
-  t+=lin(tg('custo','Custo do produto'),r=>r.st==='sem'?semC(r):val(r.custo,r.preco,{neg:1}));
-  if(exp.has('custo'))t+=lin('Matéria-prima',r=>r.st==='sem'?semC(r):val(r.mp,r.preco,{neg:1}),'fpv-sub')+lin('Outros insumos',r=>r.st==='sem'?semC(r):val(r.ins,r.preco,{neg:1}),'fpv-sub')+lin('Injeção',r=>r.st==='sem'?semC(r):val(r.inj,r.preco,{neg:1}),'fpv-sub')+lin('Embalagem',r=>r.st==='sem'?semC(r):val(r.emb,r.preco,{neg:1}),'fpv-sub');
-  t+=lin(`Frete s/ vendas <span class="fpv-pp">${pc(p.frete/100)}</span>`,r=>val(r.frete,r.preco,{neg:1}));
-  t+=lin(`Comissão <span class="fpv-pp">${pc(p.comissao/100)}</span>`,r=>val(r.com,r.preco,{neg:1}));
+  const clic=(r,k,v)=>r.st==='sem'?semC(r):`<td class="num fpv-clic${qd&&qd.cod===r.cod&&qd.k===k?' on':''}" data-fpvq="${k}|${esc(r.cod)}" role="button" tabindex="0" title="Ver o quadro de ${k==='mp'?'matéria-prima':'injeção'} deste produto"><span class="fpv-v">${v>0.005?'−':''}${v2(v)}</span><small>${pc(r.preco?v/r.preco:NaN)}</small></td>`;
+  t+=lin('Matéria-prima <span class="fpv-pp">clique no valor</span>',r=>clic(r,'mp',r.mp));
+  t+=lin('Custo injeção <span class="fpv-pp">clique no valor</span>',r=>clic(r,'inj',r.inj));
+  t+=lin('Embalagem e outros',r=>r.st==='sem'?semC(r):val(r.embIns,r.preco,{neg:1}));
+  t+=lin(`Frete s/ vendas <span class="fpv-pp">${pc2(p.frete)}</span>`,r=>val(r.frete,r.preco,{neg:1}));
   t+=lin('Total custos',r=>r.st==='sem'?semC(r):val(r.tot,r.preco,{neg:1}),'fpv-forte');
-  t+=lin('MC (margem de contribuição)',r=>r.st==='sem'?semC(r):`<td class="num fpv-mc${r.mc<0?' neg':' pos'}${r.st==='parcial'?' parcial':''}"><span class="fpv-v">${r.mc<0?'−':''}R$ ${rs(r.mc,r.preco)}</span><b>${pc(r.mcp)}</b>${r.st==='parcial'?'<small>custo parcial</small>':''}</td>`,'fpv-l-mc');
+  t+=lin('MC',r=>r.st==='sem'?semC(r):`<td class="num fpv-mc${r.mc<0?' neg':' pos'}${r.st==='parcial'?' parcial':''}"${r.st==='parcial'?` title="Custo parcial: ${esc(r.motivos.join(' · '))}"`:''}><span class="fpv-v">${r.mc<-0.005?'−':''}${v2(r.mc)}</span><b>${pc(r.mcp)}</b></td>`,'fpv-l-mc');
   t+='</tbody></table></div>';
-  h+=t+`<p class="small muted">Preço = preço médio faturado no período (valor ÷ quantidade, só CFOPs de receita); digite outro valor para simular e "voltar" para desfazer. Custo do produto = ficha da Estruturas › Formação de preço: matéria-prima e outros insumos da estrutura (custo da última compra ou digitado), injeção (horas do roteiro × R$ ${HORA_MAQ}/h) e embalagem (caixa ÷ peças por caixa e demais itens da estrutura). MC = preço − impostos − custo − frete − comissão; % sobre o preço de venda. Produtos sem estrutura, com item sem custo ou sem roteiro de injeção ficam fora da MC média. Industrialização (CFOP x124/x125): o preço cobre o serviço, mas o custo da estrutura soma todos os materiais, inclusive os que o cliente envia.</p>`;
-  box.innerHTML=h;
+  /* Quadro do produto clicado: composição da matéria-prima ou processo de injeção. */
+  const rq=qd&&R.find(r=>r.cod===qd.cod);
+  if(rq){const tit=`<div class="fpv-qcab"><b>${qd.k==='mp'?'Matéria-prima':'Custo injeção'} · ${esc(rq.desc)}</b> <span class="mono small muted">${esc(rq.cod)}</span><span class="cresce"></span><button type="button" class="bt" data-fpvq="${qd.k}|${esc(rq.cod)}">Fechar</button></div>`;
+    if(qd.k==='mp')t+=`<div class="fpv-quadro" id="fpvQuadro">${tit}<div class="scroll"><table class="compacto"><thead><tr><th>Tipo de MP</th><th class="num">Peso (g)</th><th class="num">Valor/kg</th><th class="num">Custo da MP</th></tr></thead><tbody>${rq.mps.length?rq.mps.map(x=>`<tr><td>${esc(x.desc)}${x.cl?' <span class="pill p-info" title="Enviada pelo cliente (remessa para industrialização): sem custo">cliente</span>':x.zv?' <span class="pill p-info">Vaeso</span>':''}</td><td class="num">${num(x.g,2)}</td><td class="num">${x.unit===null?'<span class="txt-stop">sem custo</span>':v2(x.unit)}</td><td class="num">${x.val===null?'–':v2(x.val)}</td></tr>`).join(''):'<tr><td colspan="4" class="empty">Sem matéria-prima em kg na estrutura.</td></tr>'}<tr class="tot"><td><b>Total</b></td><td class="num"><b>${num(rq.mps.reduce((a,x)=>a+x.g,0),2)}</b></td><td></td><td class="num"><b>${v2(rq.mp)}</b></td></tr></tbody></table></div></div>`;
+    else t+=`<div class="fpv-quadro" id="fpvQuadro">${tit}<div class="scroll"><table class="compacto"><thead><tr><th>Peça</th><th>Molde</th><th class="num">Cavidades</th><th class="num">Ciclo (s)</th><th class="num">Peças/hora</th><th class="num">Qtd. por produto</th><th class="num">Valor hora máquina</th><th class="num">Custo por peça</th></tr></thead><tbody>${rq.injs.length?rq.injs.map(x=>`<tr><td>${esc(x.desc||x.peca)} <span class="mono small muted">${esc(x.peca)}</span></td><td class="mono">${esc(x.molde||'')}</td><td class="num">${num(x.cav,0)}</td><td class="num">${num(x.ciclo,0)}</td><td class="num">${num(x.ph,0)}</td><td class="num">${num(x.mult,2)}</td><td class="num">${v2(HORA_MAQ)}</td><td class="num">${v2(x.custo)}</td></tr>`).join(''):'<tr><td colspan="8" class="empty">Sem roteiro de injeção.</td></tr>'}<tr class="tot"><td colspan="7"><b>Total por produto</b></td><td class="num"><b>${v2(rq.inj)}</b></td></tr></tbody></table></div></div>`}
+  box.innerHTML=h+t;
 }
 function exportaFpv(){const R=M._fpvExport&&M._fpvExport();if(!R)return;
-  const C=[['Código',r=>r.cod],['Descrição',r=>r.desc],['Grupo',r=>r.grupoNome],['Situação do custo',r=>r.st==='ok'?'Completo':r.st==='sem'?'Sem custo':'Parcial: '+r.motivos.join(', ')],['Qtd. período',r=>r.q],['Faturamento período',r=>r.fat],['Preço médio',r=>r.pm],['Preço de venda',r=>r.preco],['ICMS',r=>r.icms],['PIS',r=>r.pis],['COFINS',r=>r.cof],['Impostos',r=>r.imp],['Preço líquido',r=>r.liq],['Matéria-prima',r=>r.mp],['Outros insumos',r=>r.ins],['Injeção',r=>r.inj],['Embalagem',r=>r.emb],['Custo do produto',r=>r.custo],['Frete',r=>r.frete],['Comissão',r=>r.com],['Total custos',r=>r.tot],['MC R$',r=>r.st==='sem'?'':r.mc],['MC %',r=>r.st==='sem'?'':Math.round(r.mcp*1000)/10]];
+  const C=[['Código',r=>r.cod],['Descrição',r=>r.desc],['Cliente principal',r=>r.cliP],['Operação',r=>r.indust?'Industrialização':'Venda'],['Situação do custo',r=>r.st==='ok'?'Completo':r.st==='sem'?'Sem custo':'Parcial: '+r.motivos.join(', ')],['Qtd. período',r=>r.q],['Faturamento período',r=>r.fat],['Preço médio',r=>r.pm],['Preço de venda',r=>r.preco],['ICMS',r=>r.icms],['PIS',r=>r.pis],['COFINS',r=>r.cof],['Impostos',r=>r.imp],['Preço líquido',r=>r.liq],['Matéria-prima',r=>r.mp],['Custo injeção',r=>r.inj],['Embalagem e outros',r=>r.embIns],['Custo do produto',r=>r.custo],['Frete',r=>r.frete],['Total custos',r=>r.tot],['MC R$',r=>r.st==='sem'?'':r.mc],['MC %',r=>r.st==='sem'?'':Math.round(r.mcp*1000)/10]];
   const cel=v=>typeof v==='number'?String(Math.round(v*100)/100).replace('.',','):'"'+String(v??'').replace(/"/g,'""')+'"';
   const lin=[C.map(c=>c[0]).join(';'),...R.map(r=>C.map(c=>cel(c[1](r))).join(';'))];
   baixaCsv('formacao-preco-mc.csv',String.fromCharCode(65279)+lin.join(String.fromCharCode(13,10)))}
@@ -521,18 +531,19 @@ const descDe=c=>M.dados.estruturas.descricoes[c]||M.dados.estruturas.produtos[c]
 function materiasPrimas(){if(M._mps)return M._mps;const E=M.dados.estruturas;const s=new Set();for(const a of Object.values(E.arvore))for(const [c] of a)if(!E.arvore[c]&&umDe(c)==='KG')s.add(c);M._mps=[...s].sort((a,b)=>COLL.compare(descDe(a),descDe(b)));return M._mps}
 function caixasTodas(){if(M._cxs)return M._cxs;const E=M.dados.estruturas;const s=new Set();for(const a of Object.values(E.arvore))for(const [c] of a)if(CAIXA_RE.test(descDe(c)))s.add(c);M._cxs=[...s].sort((a,b)=>COLL.compare(descDe(a),descDe(b)));return M._cxs}
 function procDe(cod){const r=(rotLinhas()||[]).find(r=>String(r.Produto)===String(cod)&&/INJE/i.test(r.Descricao||''));return r?{cav:r.CAVIDADES,ciclo:r.CICLO,ph:r.pecasHora,inj:injetora(r.Descricao),molde:r.Ferramenta}:null}
-function ficha(cod,vae){
-  const E=M.dados.estruturas,ov=M.form[cod]||{},mpOv=ov.mp||{};
-  const custo=c=>{if(vae&&zeraVaeso(c))return {v:0,zv:true};const k=custoComp(c);return k?{v:k.v}:{v:null}};
-  const folhas=(c,mult,vis,acc)=>{for(const [x,q,pr] of E.arvore[c]||[]){const qq=q*(1+(pr||0)/100)*mult;if(E.arvore[x]&&!vis.has(x)){const nv=new Set(vis);nv.add(x);folhas(x,qq,nv,acc)}else acc.push({c:x,q:qq})}return acc};
+/* cl: códigos que o cliente envia (remessa x901); na industrialização entram com custo zero e não abrem a estrutura. */
+function ficha(cod,vae,cl=null){
+  const E=M.dados.estruturas,ov=M.form[cod]||{},mpOv=ov.mp||{};const doCli=c=>!!cl&&cl.has(String(c));
+  const custo=c=>{if(doCli(c))return {v:0,cl:true};if(vae&&zeraVaeso(c))return {v:0,zv:true};const k=custoComp(c);return k?{v:k.v}:{v:null}};
+  const folhas=(c,mult,vis,acc)=>{for(const [x,q,pr] of E.arvore[c]||[]){const qq=q*(1+(pr||0)/100)*mult;if(E.arvore[x]&&!vis.has(x)&&!doCli(x)){const nv=new Set(vis);nv.add(x);folhas(x,qq,nv,acc)}else acc.push({c:x,q:qq})}return acc};
   const grupos=[],emb=[],soltas=[];
   for(const [x,q,pr] of E.arvore[cod]||[]){const qq=q*(1+(pr||0)/100);
-    if(E.arvore[x])grupos.push({item:descDe(x),cod:x,proc:procDe(x),linhas:folhas(x,qq,new Set([cod,x]),[])});
+    if(E.arvore[x]&&!doCli(x))grupos.push({item:descDe(x),cod:x,proc:procDe(x),linhas:folhas(x,qq,new Set([cod,x]),[])});
     else if(EMB_RE.test(descDe(x)))emb.push({c:x,q:qq});
     else soltas.push({c:x,q:qq})}
   if(soltas.length){const pp=procDe(cod);if(pp&&!grupos.length)grupos.unshift({item:descDe(cod),cod,proc:pp,linhas:soltas});else for(const s of soltas)grupos.push({item:descDe(s.c),cod:s.c,proc:null,linhas:[s]})}
   let mp=0,peso=0,falta=0;
-  for(const g of grupos)for(const l of g.linhas){l.key=g.cod+'>'+l.c;l.mp=mpOv[l.key]||l.c;l.um=umDe(l.mp)||umDe(l.c)||(l.q<0.1?'KG':'');const k=custo(l.mp);l.unit=k.v;l.zv=k.zv;l.val=k.v===null?null:l.q*k.v;if(k.v===null)falta++;else mp+=l.val;if(l.um==='KG')peso+=l.q*1000}
+  for(const g of grupos)for(const l of g.linhas){l.key=g.cod+'>'+l.c;l.mp=mpOv[l.key]||l.c;l.um=umDe(l.mp)||umDe(l.c)||(l.q<0.1?'KG':'');const k=custo(l.mp);l.unit=k.v;l.zv=k.zv;l.cl=k.cl;l.val=k.v===null?null:l.q*k.v;if(k.v===null)falta++;else mp+=l.val;if(l.um==='KG')peso+=l.q*1000}
   /* Embalagem: caixa (ou saco) define peças por caixa; os outros itens entram pelo custo da estrutura. */
   const cxE=emb.find(e=>CAIXA_RE.test(descDe(e.c)));const tipo=ov.tipo||cxE?.c||'';
   const pcsCx=+ov.pcsCx||(cxE&&cxE.q?Math.round(1/cxE.q):0),cxsPallet=+ov.cxsPallet||0;
@@ -984,6 +995,7 @@ document.addEventListener('click',e=>{
   if(t.closest('#fpvExcel')){exportaFpv();return}
   if(t.closest('#fpvPdf')){window.print();return}
   const fx=t.closest('[data-fpvexp]');if(fx){const s=ui('fpv_exp',()=>new Set());const k=fx.dataset.fpvexp;s.has(k)?s.delete(k):s.add(k);rerender();document.querySelector(`[data-fpvexp="${k}"]`)?.focus();return}
+  const fq=t.closest('[data-fpvq]');if(fq){const [k,cod]=fq.dataset.fpvq.split('|');const a=M.ui.fpv_q;const abre=!(a&&a.k===k&&a.cod===cod);M.ui.fpv_q=abre?{k,cod}:null;rerender();if(abre)$('fpvQuadro')?.scrollIntoView({block:'nearest',behavior:'smooth'});return}
   const fl=t.closest('[data-fpvlimpa]');if(fl){salvaFicha(fl.dataset.fpvlimpa,{precoSim:''},'Preço médio de volta.');return}
   const fm=t.closest('[data-fpvmodo]');if(fm){salvaFpv({modo:fm.dataset.fpvmodo});return}
   if(t.closest('input,select'))return;
@@ -1002,7 +1014,7 @@ document.addEventListener('click',e=>{
   const fo=t.closest('[data-fpopen]');if(fo){const s=ui('fp_open',()=>new Set());const k=fo.dataset.fpopen;umaSo(s,k);rerender();return}
   const er=t.closest('tr[data-est]');if(er){const s=ui('est_open',()=>new Set());const k=er.dataset.est;umaSo(s,k);rerender();return}
 });
-document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('tr[data-est],tr[data-nfopen],tr[data-fatnota],[data-fatbar],[data-fpopen],[data-cnfopen]')){e.preventDefault();e.target.click()}});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('tr[data-est],tr[data-nfopen],tr[data-fatnota],[data-fatbar],[data-fpopen],[data-cnfopen],td[data-fpvq]')){e.preventDefault();e.target.click()}});
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t.dataset.fpvpreco){const raw=t.value.trim();const v=raw===''?'':+raw.replace(/\./g,'').replace(',','.');if(raw!==''&&!(isFinite(v)&&v>0)){toast('Preço inválido. Use números, por exemplo 12,50.');return}salvaFicha(t.dataset.fpvpreco,{precoSim:v},v===''?'Preço médio de volta.':'Preço para simular salvo.');return}
