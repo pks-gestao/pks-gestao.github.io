@@ -165,6 +165,87 @@ function renderFaturamento(){
   box.innerHTML=h;
 }
 
+/* ---------- Faturamento › Formação de preço: margem de contribuição por produto (modelo da Formação de Preço do Gestão Vaeso, pedido do Chai, 23/11/2026) ----------
+   Preço = preço médio faturado no período (CFOPs de receita) ou o preço digitado para simular (formacao/<cod>.precoSim).
+   Custo = ficha da Estruturas › Formação de preço: matéria-prima (kg), outros insumos, injeção (roteiro × R$ 70/h) e embalagem.
+   Impostos, frete e comissão: premissas em config/fpvenda. ICMS por dentro do preço; PIS e COFINS sobre (preço − ICMS); frete e comissão sobre o preço.
+   MC = preço − impostos − custo − frete − comissão; MC % sobre o preço. Produto sem estrutura ou com custo incompleto fica fora da MC média. */
+const FPV_GRUPOS=[['todos','Todos'],...PRINCIPAIS,['outros','Outros clientes']];
+function fpvPrem(){const c=M.fpv||{},d={icms:12,pis:1.65,cofins:7.6,frete:+cfg().fretePct||0,comissao:+cfg().comissaoPct||0,modo:'prem'};const o={};for(const k in d)o[k]=c[k]===undefined||c[k]===null||c[k]===''?d[k]:c[k];return o}
+function fpvLinhas(){
+  const g=new Map();
+  for(const l of fatLinhas()){if(tipoCfop(l.cfop).t!=='Receita'||!noPeriodo('fpv',l.data))continue;
+    const o=g.get(l.cod)||{cod:l.cod,desc:l.desc,un:l.un,q:0,fat:0,icms:0,pis:0,cofins:0,ind:0,cli:new Map()};
+    o.q+=l.q;o.fat+=l.total;o.icms+=l.icms;o.pis+=l.pis;o.cofins+=l.cofins;if(['124','125'].includes(String(l.cfop).slice(1)))o.ind+=l.total;o.cli.set(l.destNome,(o.cli.get(l.destNome)||0)+l.total);g.set(l.cod,o)}
+  return [...g.values()].filter(o=>o.q>0&&o.fat>0).map(o=>{const cp=[...o.cli].sort((a,b)=>b[1]-a[1])[0][0];const pr=PRINCIPAIS.find(([k])=>cp.toUpperCase().includes(k));
+    return {...o,cliP:cp,grupo:pr?pr[0]:'outros',grupoNome:pr?pr[1]:cp.split(/[\s,.\/-]+/)[0],vae:[...o.cli.keys()].every(ehVaeso),indust:o.ind>o.fat/2}});
+}
+function fpvCalc(o,p){
+  const f=ficha(o.cod,o.vae);let mp=0,ins=0;
+  for(const g of f.grupos)for(const l of g.linhas)if(l.val!==null){if(l.um==='KG')mp+=l.val;else ins+=l.val}
+  const custo=mp+ins+f.vInj+f.vEmb;
+  const motivos=[];if(f.temE){if(f.falta)motivos.push(f.falta+' item'+(f.falta===1?'':'s')+' sem custo');if(!f.vInj)motivos.push('sem roteiro de injeção')}
+  const st=!f.temE?'sem':motivos.length?'parcial':'ok';
+  const pm=o.fat/o.q,sim=+(M.form[o.cod]?.precoSim)||0,preco=sim||pm;
+  let icms,pis,cof;
+  if(p.modo==='xml'){icms=preco*o.icms/o.fat;pis=preco*o.pis/o.fat;cof=preco*o.cofins/o.fat}
+  else{icms=preco*p.icms/100;pis=(preco-icms)*p.pis/100;cof=(preco-icms)*p.cofins/100}
+  const imp=icms+pis+cof,liq=preco-imp,frete=preco*p.frete/100,com=preco*p.comissao/100,tot=custo+frete+com,mc=liq-tot;
+  return {...o,f,mp,ins,inj:f.vInj,emb:f.vEmb,custo,st,motivos,pm,sim,preco,icms,pis,cof,imp,liq,frete,com,tot,mc,mcp:preco?mc/preco:0};
+}
+function renderFpVenda(){
+  const box=$('v-fpvenda');
+  if(!fatLinhas()||!M.dados.estruturas||!rotLinhas()){box.innerHTML=esperando('Carregando faturamento, estruturas e roteiro…');Promise.all([carregar('faturamento'),carregar('estruturas'),carregar('roteiro')]).then(()=>{if(M.atual==='fpvenda')renderFpVenda()}).catch(()=>box.innerHTML=esperando('Não foi possível carregar os dados.'));return}
+  const p=fpvPrem(),gr=ui('fpv_grupo','todos'),q=ui('b_fpv',''),so=ui('fpv_custo','todos'),op=ui('fpv_op','todas'),exp=ui('fpv_exp',()=>new Set());
+  const todas=fpvLinhas().map(o=>fpvCalc(o,p));
+  const R=todas.filter(r=>(gr==='todos'||r.grupo===gr)&&(so==='todos'||(so==='ok'?r.st==='ok':r.st!=='ok'))&&(op==='todas'||(op==='indust')===r.indust)&&casa(`${r.cod} ${r.desc} ${[...r.cli.keys()].join(' ')}`,q)).sort((a,b)=>b.fat-a.fat);
+  const ok=R.filter(r=>r.st==='ok'),fatOk=ok.reduce((a,r)=>a+r.fat,0),fatT=R.reduce((a,r)=>a+r.fat,0);
+  const mcPond=fatOk?ok.reduce((a,r)=>a+r.mcp*r.fat,0)/fatOk:null,mcSimp=ok.length?ok.reduce((a,r)=>a+r.mcp,0)/ok.length:null;
+  M._fpvExport=()=>R;
+  const pc=v=>isFinite(v)?(v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}).replace('-','−')+'%':'–';
+  /* Preço abaixo de R$ 1: valores por peça com 4 casas (como na ficha da Estruturas); demais, 2 casas. */
+  const rs=(v,P)=>Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:P<1?4:2,maximumFractionDigits:P<1?4:2});
+  const pc2=v=>(+v||0).toLocaleString('pt-BR',{maximumFractionDigits:2})+'%';
+  const cor=v=>v===null?'':v<0?' neg':' pos';
+  const pin=(k,l)=>`<label class="fpv-pin"><span>${l}</span><span class="pct-in"><input class="custo" type="text" inputmode="decimal" id="fpvp_${k}" data-fpvprem="${k}" value="${String(p[k]).replace('.',',')}" aria-label="${l} em %"${p.modo==='xml'&&['icms','pis','cofins'].includes(k)?' disabled':''}> %</span></label>`;
+  let h=`<div class="tools fpv-topo"><div class="seg" role="group" aria-label="Grupo de clientes">${FPV_GRUPOS.map(([k,l])=>`<button type="button" data-uiset="fpv_grupo" data-v="${k}" aria-pressed="${gr===k}">${esc(l)}</button>`).join('')}</div>
+  <span class="cresce"></span><button type="button" class="bt" id="fpvExcel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14"/></svg>Exportar Excel</button><button type="button" class="bt" id="fpvPdf"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/></svg>PDF</button></div>
+  <div class="tools filtros">${periodoUI('fpv')}${selUI('fpv_op',[['todas','Venda e industrialização'],['venda','Só venda'],['indust','Só industrialização']],'Operação','todas')}${selUI('fpv_custo',[['todos','Todos'],['ok','Com custo completo'],['falta','Sem custo ou parcial']],'Custo')}${buscaUI('fpv','Produto, código ou cliente')}</div>
+  <div class="cards3 fpv-kpis"><div class="card-k verde"><span>MC média ponderada</span><b class="${cor(mcPond)}">${mcPond===null?'–':pc(mcPond)}</b><small class="muted">Pelo faturamento do período · média simples <b>${mcSimp===null?'–':pc(mcSimp)}</b></small></div>
+  <div class="card-k"><span>Faturamento do período</span><b>${brl0(fatT)}</b><small class="muted">${esc(perTexto(ui('per_fpv',()=>({}))))} · ${R.length} produto${R.length===1?'':'s'}</small></div>
+  <div class="card-k"><span>Produtos com custo completo</span><b>${ok.length} de ${R.length}</b><small class="muted">${brl0(fatOk)} do faturamento entra na MC média</small></div></div>
+  <details class="fpv-prem"${ui('fpv_premab',false)?' open':''}><summary>Premissas <span class="small muted">ICMS ${p.modo==='xml'?'das notas':pc2(p.icms)} · PIS ${p.modo==='xml'?'das notas':pc2(p.pis)} · COFINS ${p.modo==='xml'?'das notas':pc2(p.cofins)} · Frete ${pc2(p.frete)} · Comissão ${pc2(p.comissao)}</span></summary>
+  <div class="fpv-prem-in"><div class="seg" role="group" aria-label="Impostos">${[['prem','Impostos pelas premissas'],['xml','Impostos das notas (XML)']].map(([k,l])=>`<button type="button" data-fpvmodo="${k}" aria-pressed="${p.modo===k}">${l}</button>`).join('')}</div>
+  ${pin('icms','ICMS')}${pin('pis','PIS')}${pin('cofins','COFINS')}${pin('frete','Frete s/ vendas')}${pin('comissao','Comissão')}</div>
+  <p class="small muted">ICMS por dentro do preço; PIS e COFINS sobre o preço menos o ICMS; frete e comissão sobre o preço. Em "Impostos das notas", cada produto usa o ICMS, PIS e COFINS que saíram nas notas do período, em % do valor. Valem para todos os produtos e ficam salvas.</p></details>`;
+  if(!R.length){box.innerHTML=h+esperando('Nenhum produto faturado com esse filtro.');return}
+  const val=(v,P,o={})=>`<td class="num${o.cls||''}"><span class="fpv-v">${o.neg&&v>0?'−':''}${rs(v,P)}</span><small>${pc(P?v/P:NaN)}</small></td>`;
+  const semC=r=>`<td class="num fpv-semc"><span>${r.st==='sem'?'Sem custo':'–'}</span></td>`;
+  const tg=(k,l)=>`<button type="button" class="fpv-tg" data-fpvexp="${k}" aria-expanded="${exp.has(k)}"><i aria-hidden="true">${exp.has(k)?'▾':'▸'}</i>${l}</button>`;
+  const lin=(rot,cel,cls='')=>`<tr class="${cls}"><th scope="row" class="fpv-rot">${rot}</th>${R.map(cel).join('')}</tr>`;
+  const ini=d=>esc(String(d||'').replace(/[^A-Za-zÀ-ú0-9 ]/g,' ').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?');
+  const status=r=>r.st==='ok'?'':r.st==='sem'?'<span class="pill p-stop">Sem custo</span>':`<span class="pill p-warn" title="${esc(r.motivos.join(' · '))}">Parcial</span>`;
+  let t=`<div class="fpv-wrap"><table class="fpv"><thead><tr><th class="fpv-rot fpv-canto">Produto</th>${R.map(r=>`<th class="fpv-prod" scope="col"><span class="fpv-ic" aria-hidden="true">${ini(r.desc)}</span><b title="${esc(r.desc)}">${esc(r.desc)}</b><small class="mono">${esc(r.cod)}</small><small title="${esc(r.cliP)}">${esc(r.grupoNome)}</small><span class="fpv-tags">${r.indust?'<span class="pill p-info" title="Mais da metade do valor em CFOP x124/x125">Industrialização</span>':''}${r.vae?'<span class="pill p-info" title="Caixa e master sem custo">Vaeso</span>':''}${status(r)}</span></th>`).join('')}</tr></thead><tbody>`;
+  t+=lin('Preço de venda',(r,i)=>`<td class="num fpv-preco"><input class="custo${r.sim?' manual':''}" type="text" inputmode="decimal" id="fpvpr_${i}" data-fpvpreco="${esc(r.cod)}" value="${rs(r.preco,r.preco)}" aria-label="Preço de venda de ${esc(r.desc)}"><small>${r.sim?`médio ${rs(r.pm,r.pm)} <button type="button" class="fpv-lk" data-fpvlimpa="${esc(r.cod)}" title="Voltar ao preço médio faturado">voltar</button>`:`médio · ${num(r.q,0)} ${esc((r.un||'').toLowerCase())}`}</small></td>`,'fpv-l-preco');
+  t+=lin(`${tg('imp','(−) Impostos')} <span class="fpv-pp">${p.modo==='xml'?'notas':pc((p.icms+(100-p.icms)*(p.pis+p.cofins)/100)/100)}</span>`,r=>val(r.imp,r.preco,{neg:1}));
+  if(exp.has('imp'))t+=lin('ICMS',r=>val(r.icms,r.preco,{neg:1}),'fpv-sub')+lin('PIS',r=>val(r.pis,r.preco,{neg:1}),'fpv-sub')+lin('COFINS',r=>val(r.cof,r.preco,{neg:1}),'fpv-sub');
+  t+=lin('(=) Preço líquido',r=>val(r.liq,r.preco),'fpv-forte');
+  t+=lin(tg('custo','Custo do produto'),r=>r.st==='sem'?semC(r):val(r.custo,r.preco,{neg:1}));
+  if(exp.has('custo'))t+=lin('Matéria-prima',r=>r.st==='sem'?semC(r):val(r.mp,r.preco,{neg:1}),'fpv-sub')+lin('Outros insumos',r=>r.st==='sem'?semC(r):val(r.ins,r.preco,{neg:1}),'fpv-sub')+lin('Injeção',r=>r.st==='sem'?semC(r):val(r.inj,r.preco,{neg:1}),'fpv-sub')+lin('Embalagem',r=>r.st==='sem'?semC(r):val(r.emb,r.preco,{neg:1}),'fpv-sub');
+  t+=lin(`Frete s/ vendas <span class="fpv-pp">${pc(p.frete/100)}</span>`,r=>val(r.frete,r.preco,{neg:1}));
+  t+=lin(`Comissão <span class="fpv-pp">${pc(p.comissao/100)}</span>`,r=>val(r.com,r.preco,{neg:1}));
+  t+=lin('Total custos',r=>r.st==='sem'?semC(r):val(r.tot,r.preco,{neg:1}),'fpv-forte');
+  t+=lin('MC (margem de contribuição)',r=>r.st==='sem'?semC(r):`<td class="num fpv-mc${r.mc<0?' neg':' pos'}${r.st==='parcial'?' parcial':''}"><span class="fpv-v">${r.mc<0?'−':''}R$ ${rs(r.mc,r.preco)}</span><b>${pc(r.mcp)}</b>${r.st==='parcial'?'<small>custo parcial</small>':''}</td>`,'fpv-l-mc');
+  t+='</tbody></table></div>';
+  h+=t+`<p class="small muted">Preço = preço médio faturado no período (valor ÷ quantidade, só CFOPs de receita); digite outro valor para simular e "voltar" para desfazer. Custo do produto = ficha da Estruturas › Formação de preço: matéria-prima e outros insumos da estrutura (custo da última compra ou digitado), injeção (horas do roteiro × R$ ${HORA_MAQ}/h) e embalagem (caixa ÷ peças por caixa e demais itens da estrutura). MC = preço − impostos − custo − frete − comissão; % sobre o preço de venda. Produtos sem estrutura, com item sem custo ou sem roteiro de injeção ficam fora da MC média. Industrialização (CFOP x124/x125): o preço cobre o serviço, mas o custo da estrutura soma todos os materiais, inclusive os que o cliente envia.</p>`;
+  box.innerHTML=h;
+}
+function exportaFpv(){const R=M._fpvExport&&M._fpvExport();if(!R)return;
+  const C=[['Código',r=>r.cod],['Descrição',r=>r.desc],['Grupo',r=>r.grupoNome],['Situação do custo',r=>r.st==='ok'?'Completo':r.st==='sem'?'Sem custo':'Parcial: '+r.motivos.join(', ')],['Qtd. período',r=>r.q],['Faturamento período',r=>r.fat],['Preço médio',r=>r.pm],['Preço de venda',r=>r.preco],['ICMS',r=>r.icms],['PIS',r=>r.pis],['COFINS',r=>r.cof],['Impostos',r=>r.imp],['Preço líquido',r=>r.liq],['Matéria-prima',r=>r.mp],['Outros insumos',r=>r.ins],['Injeção',r=>r.inj],['Embalagem',r=>r.emb],['Custo do produto',r=>r.custo],['Frete',r=>r.frete],['Comissão',r=>r.com],['Total custos',r=>r.tot],['MC R$',r=>r.st==='sem'?'':r.mc],['MC %',r=>r.st==='sem'?'':Math.round(r.mcp*1000)/10]];
+  const cel=v=>typeof v==='number'?String(Math.round(v*100)/100).replace('.',','):'"'+String(v??'').replace(/"/g,'""')+'"';
+  const lin=[C.map(c=>c[0]).join(';'),...R.map(r=>C.map(c=>cel(c[1](r))).join(';'))];
+  baixaCsv('formacao-preco-mc.csv',String.fromCharCode(65279)+lin.join(String.fromCharCode(13,10)))}
+
 /* ---------- Classificação: fornecedores e CFOP ---------- */
 /* Cada fornecedor e cada CFOP recebe "gera financeiro" e "movimenta estoque" (sim/não). Fica na coleção classif. */
 const SUF_ENT={'101':'Compra para industrialização','102':'Compra para comercialização','124':'Industrialização efetuada por outra empresa','201':'Devolução de venda de produção','202':'Devolução de venda de mercadoria','352':'Aquisição de serviço de transporte (indústria)','353':'Aquisição de serviço de transporte (comércio)','401':'Compra para industrialização com ST','403':'Compra para comercialização com ST','406':'Compra de ativo imobilizado com ST','407':'Compra de uso e consumo com ST','551':'Compra de ativo imobilizado','556':'Compra de material de uso e consumo','653':'Compra de combustível para consumo','901':'Entrada para industrialização por encomenda','902':'Retorno de mercadoria remetida para industrialização','903':'Entrada de mercadoria remetida e não aplicada','908':'Entrada de bem em comodato','910':'Entrada em bonificação, doação ou brinde','912':'Entrada para demonstração','915':'Entrada para conserto ou reparo','916':'Retorno de mercadoria remetida para conserto','922':'Lançamento de simples faturamento (entrega futura)','933':'Aquisição de serviço tributado pelo ISSQN','949':'Outra entrada não especificada'};
@@ -502,11 +583,19 @@ function fichaHTML(cod,f){
   <tr><th>Item</th><th class="fp-m">MP</th><th class="fp-m num">Peso (g)</th><th class="fp-m num">Valor/kg</th><th class="fp-m num">Custo MP</th><th class="fp-p num">Cavid.</th><th class="fp-p num">Ciclo (s)</th><th class="fp-p num">Peças/h</th><th class="fp-p">Injetora</th><th class="fp-e num">Pçs/cx</th><th class="fp-e num">Pçs/pallet</th><th class="fp-e num">Cxs/pallet</th><th class="fp-e">Tipo de caixa</th></tr></thead>
   <tbody>${rows}<tr class="fp-tot"><td colspan="2">Total do produto</td><td class="num">${num(f.peso,0)}</td><td></td><td class="num mono">${num(f.mp,4)}</td><td colspan="4" class="num">${np(f.vInj)}</td><td colspan="4" class="num">${np(f.vEmb)}</td></tr></tbody></table></div>`;
 }
-async function salvaFicha(cod,patch){
+async function salvaFicha(cod,patch,msg='Ficha salva.'){
   const atual={...(M.form[cod]||{}),...patch,em:new Date().toISOString()};M.form[cod]=atual;rerender();
   if(!S.db){toast('Sem conexão com a base. A alteração não foi salva.');return}
-  try{await S.db.doc('formacao/'+String(cod).replace(/[^A-Za-z0-9_:.-]/g,'-')).set(atual);toast('Ficha salva.')}catch{toast('A ficha não foi salva. Tente novamente.')}
+  try{await S.db.doc('formacao/'+String(cod).replace(/[^A-Za-z0-9_:.-]/g,'-')).set(atual);toast(msg)}catch{toast('Não foi salvo. Tente novamente.')}
 }
+
+/* Premissas da Faturamento › Formação de preço (config/fpvenda). */
+async function salvaFpv(patch){
+  const atual={...(M.fpv||{}),...patch,em:new Date().toISOString()};M.fpv=atual;rerender();
+  if(!S.db){toast('Sem conexão com a base. A premissa não foi salva.');return}
+  try{await S.db.doc('config/fpvenda').set(atual);toast('Premissa salva.')}catch{toast('A premissa não foi salva. Tente novamente.')}
+}
+document.addEventListener('toggle',e=>{if(e.target.classList?.contains('fpv-prem'))M.ui.fpv_premab=e.target.open},true);
 
 /* ---------- Cadastros: produtos de entrada (comprados) ---------- */
 /* Entradas: itens comprados que não são faturados e itens da estrutura sem compra no ano.
@@ -866,7 +955,7 @@ function exportaMC(){const x=M._mcExport&&M._mcExport();if(!x)return;
   baixaCsv('margem-contribuicao-'+ui('fech_per','ano')+(ui('mc_cli','todos')!=='todos'?'-'+ui('mc_cli','todos').split(' ')[0].toLowerCase():'')+'.csv',String.fromCharCode(65279)+lin.join(String.fromCharCode(13,10)))}
 
 /* ---------- eventos ---------- */
-const RENDER={home:renderHome,pcpvaeso:renderPcpVaeso,custonf:renderCustoNf,formacao:renderFormacao,forn:renderForn,cfop:renderCfop,faturamento:renderFaturamento,clientes:renderClientes,produtos:renderProdutos,nfe:renderNfe,estrutura:renderEstrutura,roteiro:renderRoteiro,mc:renderMC,dre:renderDRE};
+const RENDER={home:renderHome,fpvenda:renderFpVenda,pcpvaeso:renderPcpVaeso,custonf:renderCustoNf,formacao:renderFormacao,forn:renderForn,cfop:renderCfop,faturamento:renderFaturamento,clientes:renderClientes,produtos:renderProdutos,nfe:renderNfe,estrutura:renderEstrutura,roteiro:renderRoteiro,mc:renderMC,dre:renderDRE};
 M.atual=null;
 M.vxPainelAtivo=()=>document.activeElement?.id==='vxQtd';
 /* Só um item aberto por vez. */
@@ -892,6 +981,11 @@ document.addEventListener('click',e=>{
   const fv=t.closest('[data-fv]');if(fv){M.ui.fat_vis=fv.dataset.fv;rerender();return}
   const mv=t.closest('[data-mcv]');if(mv){M.ui.mc_vis=mv.dataset.mcv;rerender();return}
   if(t.closest('#mcExport')){exportaMC();return}
+  if(t.closest('#fpvExcel')){exportaFpv();return}
+  if(t.closest('#fpvPdf')){window.print();return}
+  const fx=t.closest('[data-fpvexp]');if(fx){const s=ui('fpv_exp',()=>new Set());const k=fx.dataset.fpvexp;s.has(k)?s.delete(k):s.add(k);rerender();document.querySelector(`[data-fpvexp="${k}"]`)?.focus();return}
+  const fl=t.closest('[data-fpvlimpa]');if(fl){salvaFicha(fl.dataset.fpvlimpa,{precoSim:''},'Preço médio de volta.');return}
+  const fm=t.closest('[data-fpvmodo]');if(fm){salvaFpv({modo:fm.dataset.fpvmodo});return}
   if(t.closest('input,select'))return;
   const fn=t.closest('tr[data-fatnota]');if(fn){umaSo(ui('fatn_open',()=>new Set()),fn.dataset.fatnota);rerender();return}
   const fc=t.closest('[data-fatbar]');if(fc){const [de,ate,mes]=fc.dataset.fatbar.split('|');Object.assign(ui('per_fat',()=>({})),mes?{modo:'mes',de,ate}:{modo:'int',de,ate});M.ui.fat_vis='notas';perMudou();document.querySelector('#v-faturamento .seg[aria-label="Visão"]')?.scrollIntoView({block:'start',behavior:'smooth'});return}
@@ -911,6 +1005,8 @@ document.addEventListener('click',e=>{
 document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('tr[data-est],tr[data-nfopen],tr[data-fatnota],[data-fatbar],[data-fpopen],[data-cnfopen]')){e.preventDefault();e.target.click()}});
 document.addEventListener('change',async e=>{
   const t=e.target;
+  if(t.dataset.fpvpreco){const raw=t.value.trim();const v=raw===''?'':+raw.replace(/\./g,'').replace(',','.');if(raw!==''&&!(isFinite(v)&&v>0)){toast('Preço inválido. Use números, por exemplo 12,50.');return}salvaFicha(t.dataset.fpvpreco,{precoSim:v},v===''?'Preço médio de volta.':'Preço para simular salvo.');return}
+  if(t.dataset.fpvprem){const raw=t.value.trim();const v=raw===''?'':+raw.replace(',','.');if(raw!==''&&!(isFinite(v)&&v>=0&&v<100)){toast('Percentual inválido.');return}salvaFpv({[t.dataset.fpvprem]:v});return}
   if(t.dataset.fpmp){const c=t.dataset.fpmp;salvaFicha(c,{mp:{...((M.form[c]||{}).mp||{}),[t.dataset.key]:t.value}});return}
   if(t.dataset.fpf){const v=t.dataset.campo==='tipo'?t.value:Math.max(0,Math.round(+t.value||0));salvaFicha(t.dataset.fpf,{[t.dataset.campo]:v});return}
   if(t.dataset.fpm){const v=Math.max(0,Math.min(90,+String(t.value).replace(',','.')||0));M.ui.fp_margem=v;rerender();return}
@@ -939,18 +1035,19 @@ document.addEventListener('change',async e=>{
     const ch=t.dataset.dch;const atual={...(M.dreValores[ch]||{}),[t.dataset.dre]:v};
     try{await S.db.doc('dre/'+ch.replace(/[^0-9_-]/g,'')).set(atual);toast('Valor salvo.')}catch{toast('Não foi possível salvar.')}return}
 });
-document.addEventListener('input',e=>{const t=e.target;if(t.dataset?.mb){M.ui['b_'+t.dataset.mb]=t.value;const k='tb_'+({fat:'fat_'+ui('fat_vis','itens'),est:'est',rot:'rot',nfe:'nfa',cli:'cli',prod:'prod',mc:'mc',forn:'forn',cfop:'cfop'}[t.dataset.mb]||'');if(M.ui[k])M.ui[k].pag=0;clearTimeout(M._t);M._t=setTimeout(rerender,180)}});
+document.addEventListener('input',e=>{const t=e.target;if(t.dataset?.mb){M.ui['b_'+t.dataset.mb]=t.value;const k='tb_'+({fat:'fat_'+ui('fat_vis','itens'),fpv:'',est:'est',rot:'rot',nfe:'nfa',cli:'cli',prod:'prod',mc:'mc',forn:'forn',cfop:'cfop'}[t.dataset.mb]||'');if(M.ui[k])M.ui[k].pag=0;clearTimeout(M._t);M._t=setTimeout(rerender,180)}});
 
 /* custos manuais e DRE salvos no banco */
 (function esperaDb(){if(!S.db){setTimeout(esperaDb,500);return}
-  S.db.collection('custos').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.custosManuais=o;if(['estrutura','mc','dre','produtos','formacao','custonf'].includes(M.atual)&&!(document.activeElement?.dataset?.custo)&&!(document.activeElement?.dataset?.itcampo))rerender()},()=>{});
-  S.db.collection('formacao').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.form=o;if(M.atual==='formacao'&&!document.activeElement?.dataset?.fpf&&!document.activeElement?.dataset?.fpmp)rerender()},()=>{});
+  S.db.collection('custos').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.custosManuais=o;if(['estrutura','mc','dre','produtos','formacao','custonf','fpvenda'].includes(M.atual)&&!(document.activeElement?.dataset?.custo)&&!(document.activeElement?.dataset?.itcampo))rerender()},()=>{});
+  S.db.collection('formacao').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.form=o;if((M.atual==='formacao'||M.atual==='fpvenda')&&!document.activeElement?.dataset?.fpf&&!document.activeElement?.dataset?.fpmp&&!document.activeElement?.dataset?.fpvpreco)rerender()},()=>{});
   S.db.collection('classif').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.classif=o;if(!document.activeElement?.dataset?.cls)rerender()},()=>{});
   S.db.doc('config/categorias').onSnapshot(s=>{M.cats=s.exists?(s.data().lista||[]):[];if(['forn','nfe'].includes(M.atual))rerender()},()=>{});
   S.db.collection('vaeso_ops').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxOps=o;M.vxPronto=true;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{M.vxPronto=true;if(M.atual==='pcpvaeso')rerender()});
   S.db.collection('vaeso_prod').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxProd=o;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
   S.db.doc('meta/vaeso_sync').onSnapshot(s=>{M.vxMeta=s.exists?s.data():null;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
-  S.db.doc('config/contabilidade').onSnapshot(s=>{M.config=s.exists?s.data():{};if(['mc','dre'].includes(M.atual)&&!(document.activeElement?.dataset?.cfg))rerender()},()=>{});
+  S.db.doc('config/contabilidade').onSnapshot(s=>{M.config=s.exists?s.data():{};if(['mc','dre','fpvenda'].includes(M.atual)&&!(document.activeElement?.dataset?.cfg))rerender()},()=>{});
+  S.db.doc('config/fpvenda').onSnapshot(s=>{M.fpv=s.exists?s.data():{};if(M.atual==='fpvenda'&&!document.activeElement?.dataset?.fpvprem)rerender()},()=>{});
   S.db.collection('dre').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.dreValores=o;if(M.atual==='dre'&&!(document.activeElement?.dataset?.dre))rerender()},()=>{});
 })();
 })();

@@ -580,6 +580,40 @@ body{background:var(--bg)}
 .fat-graf .nfa-barras.densa{gap:3px}.fat-graf .nfa-barras.densa .nfa-bar small{display:none}.fat-graf .nfa-barras.densa .nfa-bar span{font-size:10.5px}
 .fat-doc{display:block;font-size:11.5px}#v-faturamento td.trunca{max-width:300px}
 @media (max-width:600px){.fat-graf .nfa-barras{gap:4px}.fat-graf .nfa-bar small{display:none}.fat-graf .nfa-barras.densa .nfa-bar:nth-child(even) span{visibility:hidden}.fat-graf-cab .seg{margin-left:0}}
+/* Faturamento › Formação de preço (MC por produto, modelo do Gestão Vaeso, 23/11/2026) */
+:root{--fpv-ok:#2f7d5b;--fpv-ok-bg:#e8f4ee;--fpv-neg:#b3261e;--fpv-neg-bg:#fbeaea}
+[data-theme="dark"]{--fpv-ok:#74c69d;--fpv-ok-bg:#1f3a2e;--fpv-neg:#f08890;--fpv-neg-bg:#4a2427}
+#v-fpvenda{grid-template-columns:minmax(0,1fr)}#v-fpvenda>*{min-width:0}
+.fpv-topo{align-items:center;gap:10px;flex-wrap:wrap}.fpv-topo .seg{margin-left:0}
+.fpv-kpis{margin:4px 0 14px}.fpv-kpis .card-k b.pos{color:var(--fpv-ok)}.fpv-kpis .card-k b.neg{color:var(--fpv-neg)}.fpv-kpis small b{font:600 13px var(--body)}
+.fpv-prem{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:14px}
+.fpv-prem summary{cursor:pointer;font-weight:600;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+.fpv-prem-in{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:end;margin:12px 0 6px}.fpv-prem-in .seg{margin-left:0}
+.fpv-pin{display:grid;gap:4px;font-size:12px;color:var(--muted)}.fpv-pin input{width:70px;text-align:right}.fpv-pin input:disabled{opacity:.5}
+.fpv-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel);max-width:100%;max-height:calc(100vh - 140px)}
+table.fpv{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;font-variant-numeric:tabular-nums}
+table.fpv th,table.fpv td{border-bottom:1px solid var(--line);padding:8px 12px;background:var(--panel);vertical-align:middle}
+table.fpv thead th{position:sticky;top:0;z-index:2;vertical-align:top}
+table.fpv .fpv-rot{position:sticky;left:0;z-index:1;text-align:left;font:600 12px var(--body);letter-spacing:.04em;text-transform:uppercase;color:var(--ink);min-width:220px;max-width:240px;border-right:1px solid var(--line);white-space:nowrap}
+table.fpv thead .fpv-canto{z-index:3;color:var(--muted)}
+.fpv-prod{width:150px;min-width:150px;max-width:150px;text-align:left;font-weight:400}
+.fpv-prod b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font:600 12.5px/1.3 var(--body);margin-top:6px;min-height:32px}
+.fpv-prod small{display:block;font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fpv-ic{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:var(--sunken);border:1px solid var(--line);color:var(--muted);font:700 12px var(--body)}
+.fpv-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}.fpv-tags .pill{font-size:10.5px;padding:1px 6px}
+table.fpv td.num{text-align:right;white-space:nowrap}
+.fpv-v{display:block}table.fpv td small{display:block;font-size:11px;color:var(--muted)}
+.fpv-preco input{width:100px;text-align:right;font-weight:600}.fpv-lk{all:unset;cursor:pointer;color:var(--red-ink,#b3333d);text-decoration:underline}
+.fpv-pp{font:500 11px var(--body);color:var(--muted);text-transform:none;letter-spacing:0;margin-left:4px}
+.fpv-tg{all:unset;cursor:pointer;display:inline-flex;gap:6px;align-items:center}.fpv-tg:focus-visible{outline:2px solid var(--red)}.fpv-tg i{font-style:normal;width:10px;color:var(--muted)}
+tr.fpv-sub .fpv-rot{font-weight:500;text-transform:none;letter-spacing:0;padding-left:34px;color:var(--muted);font-size:12.5px}tr.fpv-sub td{background:var(--sunken)}tr.fpv-sub th{background:var(--sunken)}
+tr.fpv-forte td,tr.fpv-forte th{font-weight:700}
+tr.fpv-l-mc th,tr.fpv-l-mc td{border-bottom:0;padding-top:12px;padding-bottom:12px}
+td.fpv-mc.pos{background:var(--fpv-ok-bg);color:var(--fpv-ok)}td.fpv-mc.neg{background:var(--fpv-neg-bg);color:var(--fpv-neg)}
+td.fpv-mc b{display:block;font:700 16px var(--body)}td.fpv-mc .fpv-v{font-weight:600}td.fpv-mc.parcial b{opacity:.75}td.fpv-mc small{color:inherit;opacity:.8}
+td.fpv-semc span{color:var(--muted);font-size:12px}
+@media (max-width:600px){table.fpv .fpv-rot{min-width:118px;max-width:130px;white-space:normal;font-size:10.5px;padding:8px}.fpv-prod{width:124px;min-width:124px;max-width:124px}table.fpv th,table.fpv td{padding:7px 8px}.fpv-preco input{width:84px}tr.fpv-sub .fpv-rot{padding-left:16px}.fpv-pp{display:block;margin:2px 0 0}.fpv-wrap{max-height:none}}
+@media print{.fpv-topo,.fpv-prem,#v-fpvenda .filtros,.fpv-lk{display:none!important}.fpv-wrap{overflow:visible;max-height:none;border:0}table.fpv{font-size:10px}table.fpv .fpv-rot,table.fpv thead th{position:static}.fpv-preco input{border:0;background:none}}
 /* Produtos: caixas de financeiro e estoque */
 .chk-cls{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);white-space:nowrap;align-self:end;padding-bottom:8px}
 .chk-cls input{accent-color:var(--firebrick);width:16px;height:16px}
@@ -649,6 +683,23 @@ tr.vx-painel td{background:var(--sunken)}
 .vx-tit{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px;flex:1 1 320px;min-width:0}.vx-tit b{font:700 16px var(--body)}
 .vx-prog{display:grid;gap:3px;min-width:150px}
 .vx-itens td,.vx-itens th{padding:7px 12px}
+/* Celular (até 900px): a lateral vira gaveta aberta pelo botão Menu do topo; o submenu abre por cima dela com "Voltar" */
+.menu-bt,.sub-volta,.menu-fundo{display:none}
+@media (max-width:900px){
+  .app{display:block}
+  .side{position:fixed;top:0;bottom:0;left:0;z-index:60;width:min(84vw,300px);height:100dvh;flex-direction:column;align-items:stretch;overflow-y:auto;padding:18px 12px calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-105%);transition:transform .2s ease;visibility:hidden}
+  body.menu-on .side{transform:none;visibility:visible}
+  .side-logo{padding:0 6px 16px}.side-sec{display:block}.side-fim{display:grid}.mods{grid-auto-flow:row}.mod .chev{display:block}
+  .subnav{position:fixed;top:0;bottom:0;left:0;z-index:61;width:min(84vw,300px);height:100dvh;flex-direction:column;overflow-y:auto;padding:16px 12px;border-radius:0;box-shadow:none}
+  .sub-t{display:block}.subnav a{white-space:normal}
+  .sub-volta{all:unset;display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 10px;margin-bottom:6px;font:600 14px var(--body);color:var(--muted)}
+  .menu-fundo{display:block;position:fixed;inset:0;z-index:55;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .2s}
+  body.menu-on .menu-fundo{opacity:1;pointer-events:auto}
+  .menu-bt{display:inline-flex;align-items:center;gap:6px;flex:none;cursor:pointer;font:600 14px var(--body);padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink)}
+  .menu-bt svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+  .menu-bt:focus-visible{outline:2px solid var(--red)}
+  .wrap{padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px))}.wrap{grid-template-columns:minmax(0,1fr)}.wrap>*{min-width:0}.cards3,.home-kpis{grid-template-columns:minmax(0,1fr)}
+}
 </style>
 
 <div class="app">
@@ -664,7 +715,7 @@ tr.vx-painel td{background:var(--sunken)}
 </aside>
 <nav class="subnav" id="subnav" aria-label="Itens do módulo"></nav>
 <div class="wrap">
-  <div class="barra-topo"><div class="trilha" id="trilha">Sistema PKS</div><label class="busca-sis"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg><input type="search" id="buscaSis" list="buscaSisL" placeholder="Buscar no sistema" aria-label="Buscar uma tela do sistema"><datalist id="buscaSisL"></datalist></label><span class="data-topo" id="dataTopo"></span><button type="button" class="tema-bt" id="temaBt" aria-label="Trocar para o tema escuro" title="Tema claro ou escuro"><svg class="ic-lua" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="ic-sol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button></div>
+  <div class="barra-topo"><button type="button" class="menu-bt" id="menuBt" aria-controls="mods" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</button><div class="trilha" id="trilha">Sistema PKS</div><label class="busca-sis"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg><input type="search" id="buscaSis" list="buscaSisL" placeholder="Buscar no sistema" aria-label="Buscar uma tela do sistema"><datalist id="buscaSisL"></datalist></label><span class="data-topo" id="dataTopo"></span><button type="button" class="tema-bt" id="temaBt" aria-label="Trocar para o tema escuro" title="Tema claro ou escuro"><svg class="ic-lua" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="ic-sol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button></div>
   <div class="topo"><span class="olho" id="olhoMod"></span><h2 id="tituloMod">Home</h2><p id="subMod" hidden></p></div>
 
   <div class="notasband" id="countsBox"><div class="counts" id="counts" aria-live="polite"></div></div>
@@ -680,6 +731,7 @@ tr.vx-painel td{background:var(--sunken)}
   <section id="v-produtos" class="section" hidden></section>
   <section id="v-nfe" class="section" hidden></section>
   <section id="v-faturamento" class="section" hidden></section>
+  <section id="v-fpvenda" class="section" hidden></section>
   <section id="v-estrutura" class="section" hidden></section>
   <section id="v-custonf" class="section" hidden></section>
   <section id="v-formacao" class="section" hidden></section>
@@ -691,6 +743,7 @@ tr.vx-painel td{background:var(--sunken)}
   <section id="v-bloqueio" class="section" hidden></section>
 </div>
 </div>
+<div class="menu-fundo" id="menuFundo" aria-hidden="true"></div>
 <div class="toast" id="toast" hidden role="status"></div>
 <div class="pol" id="pol" hidden><div class="bal" role="status" aria-live="polite"><button type="button" id="polMin" aria-label="Fechar o balão do Polenta">×</button><div id="polTxt"></div></div><button type="button" class="polbtn" id="polBtn" aria-label="Polenta. Clique para mostrar ou esconder o balão. Botão direito para mais opções." aria-haspopup="menu"><svg class="boneco" viewBox="0 0 120 140" aria-hidden="true" focusable="false">
   <defs>
@@ -796,7 +849,7 @@ const MODS=[['home','Home',[['home','Home']]],['cadastros','Cadastros',[['-','Cl
   ['entradas','Entradas',[['-','Lançador de NF'],['notas','Notas para lançar'],['entrada','Entrada de Notas'],['lancadas','Lançadas'],['padrao','Padrão de lançamento'],['-','Análise'],['nfe','NF-e'],['custonf','Custo NF entrada']]],
   ['estruturas','Estruturas',[['estrutura','Estrutura do produto'],['formacao','Formação de preço'],['roteiro','Roteiro']]],
   ['pcp','PCP',[['pcpvaeso','Ordens de produção Vaeso']]],
-  ['faturamento','Faturamento',[['faturamento','Faturamento']]],
+  ['faturamento','Faturamento',[['faturamento','Faturamento'],['fpvenda','Formação de preço']]],
   ['contabilidade','Contabilidade',[['mc','MC'],['dre','DRE']]],
   ['config','Configurações',[['config','Usuários']]]];
 const ABAS=MODS.flatMap(m=>m[2].map(a=>a[0]).filter(a=>a!=='-'));
@@ -807,7 +860,7 @@ function desenhaMenu(t){
   const atual=modDe(t),aberto=MODS.find(m=>m[0]===S.modAberto)||atual,sub=!!S.subAberto;$('subnav').hidden=!sub;
   const VIS=MODS.filter(m=>m[0]!=='config'&&m[2].some(a=>a[0]!=='-'&&podeVer(a[0])));$('cfgBt').hidden=!S.acesso.adm;$('cfgBt').classList.toggle('ativo',t==='config');
   $('mods').innerHTML=VIS.map(([k,l])=>`<button type="button" class="mod${k===atual[0]?' ativo':''}${sub&&k===aberto[0]?' aberto':''}" data-mod="${k}" aria-expanded="${sub&&k===aberto[0]}" aria-controls="subnav"><svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg><span>${l}</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>`).join('');
-  $('subnav').innerHTML=`<span class="sub-t">${aberto[1]}</span>`+subVis(aberto[2]).map(([a,l])=>a==='-'?`<span class="sub-h">${l}</span>`:`<a href="#${a}" data-tab="${a}"${a===t?' aria-current="page"':''}><i aria-hidden="true"></i>${l}</a>`).join('');
+  $('subnav').innerHTML=`<button type="button" class="sub-volta" id="subVolta">‹ Voltar</button><span class="sub-t">${aberto[1]}</span>`+subVis(aberto[2]).map(([a,l])=>a==='-'?`<span class="sub-h">${l}</span>`:`<a href="#${a}" data-tab="${a}"${a===t?' aria-current="page"':''}><i aria-hidden="true"></i>${l}</a>`).join('');
 }
 function route(){let t=ABAS.includes(location.hash.slice(1))?location.hash.slice(1):'home';
   if(!podeVer(t)){const p=ABAS.find(a=>a!=='config'&&podeVer(a));if(p&&p!==t){location.hash='#'+p;return}if(!p){mostraBloqueio();return}}
@@ -833,6 +886,14 @@ document.addEventListener('click',e=>{const b=e.target.closest('button.mod');
   if(S.subAberto&&!e.target.closest('#subnav'))fechaSub(false)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.subAberto)fechaSub(true)});
 addEventListener('hashchange',route);
+const celular=()=>matchMedia('(max-width:900px)').matches;
+function menuCel(on){document.body.classList.toggle('menu-on',on);$('menuBt')?.setAttribute('aria-expanded',String(on));if(!on){S.subAberto=false;desenhaMenu(abaAtual())}}
+document.addEventListener('click',e=>{
+  if(e.target.closest('#menuBt')){menuCel(!document.body.classList.contains('menu-on'));return}
+  if(e.target.closest('#menuFundo')){menuCel(false);return}
+  if(e.target.closest('#subVolta')){S.subAberto=false;desenhaMenu(abaAtual());return}
+  if(celular()&&e.target.closest('#subnav a,.side a,button.mod[data-mod="home"]'))setTimeout(()=>menuCel(false),0)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('menu-on'))menuCel(false)});
 /* Topo: data de hoje e busca rápida pelas telas. */
 $('dataTopo').textContent=new Date().toLocaleDateString('pt-BR',{day:'numeric',month:'short',year:'numeric'}).replace(/\./g,'').replace(/ de /g,' ');
 const TELAS=MODS.flatMap(m=>m[2].filter(a=>a[0]!=='-').map(a=>[a[0],m[1]===a[1]?a[1]:m[1]+' › '+a[1]]));
