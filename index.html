@@ -574,6 +574,12 @@ body{background:var(--bg)}
 .fat-linha{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
 .fat-linha polyline{fill:none;stroke:var(--fat-linha);stroke-width:1.5;stroke-dasharray:5 4;stroke-linejoin:round}
 .fat-linha circle{fill:var(--panel);stroke:var(--fat-linha);stroke-width:1.5}
+/* Faturamento: Mês, Semana e Dia no gráfico e notas com o cliente (23/11/2026) */
+.fat-graf-cab{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}.fat-graf-cab h3{margin:0}.fat-graf-cab .seg{margin-left:auto}
+.fat-graf .nfa-bar[data-fatbar]{cursor:pointer}.fat-graf .nfa-bar.futuro span{opacity:.55}
+.fat-graf .nfa-barras.densa{gap:3px}.fat-graf .nfa-barras.densa .nfa-bar small{display:none}.fat-graf .nfa-barras.densa .nfa-bar span{font-size:10.5px}
+.fat-doc{display:block;font-size:11.5px}#v-faturamento td.trunca{max-width:300px}
+@media (max-width:600px){.fat-graf .nfa-barras{gap:4px}.fat-graf .nfa-bar small{display:none}.fat-graf .nfa-barras.densa .nfa-bar:nth-child(even) span{visibility:hidden}.fat-graf-cab .seg{margin-left:0}}
 /* Produtos: caixas de financeiro e estoque */
 .chk-cls{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);white-space:nowrap;align-self:end;padding-bottom:8px}
 .chk-cls input{accent-color:var(--firebrick);width:16px;height:16px}

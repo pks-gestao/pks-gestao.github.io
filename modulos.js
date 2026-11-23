@@ -83,18 +83,35 @@ function linhaFat(){const box=document.querySelector('.fat-graf .nfa-barras');if
   const b=box.getBoundingClientRect(),P=[...box.querySelectorAll('.nfa-bar i')].map(i=>{const r=i.getBoundingClientRect();return [r.left-b.left+r.width/2,r.top-b.top]});if(P.length<2)return;
   box.insertAdjacentHTML('beforeend',`<svg class="fat-linha" width="${b.width}" height="${b.height}" aria-hidden="true"><polyline points="${P.map(p=>p.join(',')).join(' ')}"/>${P.map(([x,y])=>`<circle cx="${x}" cy="${y}" r="3"/>`).join('')}</svg>`)}
 addEventListener('resize',()=>{if(M.atual==='faturamento')linhaFat()});
+/* Gráfico com Mês (padrão: o ano todo), Semana (últimas 12, segunda a domingo) e Dia (o mês atual). Pedido do Chai, 23/11/2026.
+   Segue o filtro de cliente, não o período. Clicar numa coluna leva o período da tela para ela e mostra as notas. */
+const isoDe=s=>{const [a,m,d]=s.split('-').map(Number);return new Date(a,m-1,d)};
+const somaDias=(s,n)=>{const d=isoDe(s);d.setDate(d.getDate()+n);return isoD(d)};
+const DIAS_SEM=['dom','seg','ter','qua','qui','sex','sáb'];
+function colunasFat(base,esc_){
+  const rec=base.filter(l=>tipoCfop(l.cfop).t==='Receita');
+  const junta=(de,ate)=>{const v=rec.filter(l=>l.data>=de&&l.data<=ate);return {v:v.reduce((a,l)=>a+l.total,0),notas:new Set(v.map(l=>l.chave)).size,cli:new Set(v.map(l=>l.destNome)).size}};
+  if(esc_==='dia'){const m=hojeISO.slice(0,7),ult=new Date(+m.slice(0,4),+m.slice(5,7),0).getDate();
+    return Array.from({length:ult},(_,i)=>{const d=m+'-'+String(i+1).padStart(2,'0');return {de:d,ate:d,rot:String(i+1),nome:`${DIAS_SEM[isoDe(d).getDay()]}, ${dt(d)}`,futuro:d>hojeISO,...junta(d,d)}})}
+  if(esc_==='semana'){const h=isoDe(hojeISO),seg=somaDias(hojeISO,-((h.getDay()+6)%7));
+    return Array.from({length:12},(_,i)=>{const de=somaDias(seg,-7*(11-i)),ate=somaDias(de,6);return {de,ate,rot:dt(de).slice(0,5),nome:`Semana de ${dt(de).slice(0,5)} a ${dt(ate)}`,...junta(de,ate)}})}
+  return Array.from({length:12},(_,i)=>{const m=ano+'-'+String(i+1).padStart(2,'0'),ate=isoD(new Date(ano,i+1,0));return {de:m+'-01',ate,mes:m,rot:MESES[i].slice(0,3),nome:`${MESES[i]}/${ano}`,futuro:m>hojeISO.slice(0,7),...junta(m+'-01',ate)}});
+}
 function grafFat(base){
-  const m=new Map();for(const l of base){if(tipoCfop(l.cfop).t!=='Receita')continue;const k=l.data.slice(0,7);m.set(k,(m.get(k)||0)+l.total)}
-  const B=[...m.entries()].sort((a,b)=>a[0].localeCompare(b[0]));if(!B.length)return '';
-  const max=Math.max(...B.map(b=>b[1]));const n0=v=>Math.round(v/1000).toLocaleString('pt-BR')+' mil';
-  return `${(setTimeout(linhaFat,30),'')}<div class="nfa-painel fat-graf"><h3>Faturamento por mês</h3><div class="nfa-barras" role="img" aria-label="Faturamento por mês">${B.map(([k,v])=>`<div class="nfa-bar" tabindex="0" title="${MESES[+k.slice(5)-1]}/${k.slice(0,4)}: R$ ${brl(v)}"><small>${n0(v)}</small><i style="height:${Math.max(2,v/max*100)}%"></i><span>${MESES[+k.slice(5)-1].slice(0,3)}/${k.slice(2,4)}</span></div>`).join('')}</div></div>`;
+  const e=ui('fat_esc','mes');const C=colunasFat(base,e);
+  const max=Math.max(1,...C.map(c=>c.v));const tot=C.reduce((a,c)=>a+c.v,0);
+  const n0=v=>v?Math.round(v/1000).toLocaleString('pt-BR')+' mil':'';
+  const tit={mes:`Faturamento por mês · ${ano}`,semana:'Faturamento por semana · últimas 12',dia:`Faturamento por dia · ${MESES[+hojeISO.slice(5,7)-1]}/${ano}`}[e];
+  const pl=(n,a,b)=>n.toLocaleString('pt-BR')+' '+(n===1?a:b);
+  return `${(setTimeout(linhaFat,30),'')}<div class="nfa-painel fat-graf"><div class="fat-graf-cab"><h3>${tit}</h3><span class="small muted">Total R$ ${brl(tot)}</span><div class="seg" role="group" aria-label="Agrupar o gráfico por">${[['mes','Mês'],['semana','Semana'],['dia','Dia']].map(([k,l])=>`<button type="button" data-uiset="fat_esc" data-v="${k}" aria-pressed="${e===k}">${l}</button>`).join('')}</div></div>
+  <div class="nfa-barras${C.length>14?' densa':''}" role="img" aria-label="${esc(tit)}">${C.map(c=>c.futuro?`<div class="nfa-bar futuro"><small></small><span>${c.rot}</span></div>`:`<div class="nfa-bar" tabindex="0" role="button" data-fatbar="${c.de}|${c.ate}|${c.mes||''}" title="${esc(c.nome)}: R$ ${brl(c.v)} · ${pl(c.notas,'nota','notas')} · ${pl(c.cli,'cliente','clientes')}. Clique para ver as notas."><small>${n0(c.v)}</small><i style="height:${Math.max(2,c.v/max*100)}%"></i><span>${c.rot}</span></div>`).join('')}</div></div>`;
 }
 function renderFaturamento(){
   const box=$('v-faturamento');const L=fatLinhas();
   if(!L){box.innerHTML=esperando('Carregando o faturamento…');carregar('faturamento').then(renderFaturamento).catch(()=>box.innerHTML=esperando('Não foi possível carregar o faturamento.'));return}
   const clientes=[...new Set(L.map(l=>l.destNome))].sort(COLL.compare);
   const cfops=[...new Set(L.map(l=>l.cfop))].sort();
-  const vis=ui('fat_vis','itens');
+  const vis=ui('fat_vis','notas');
   const cli=ui('fat_cli','todos'),cf=ui('fat_cfop','todos'),tp=ui('fat_tipo','receita'),q=ui('b_fat','');
   const F=L.filter(l=>noPeriodo('fat',l.data)&&(cli==='todos'||l.destNome===cli)&&casa(`${l.nota} ${l.destNome} ${l.cod} ${l.desc} ${l.cfop} ${l.natOp}`,q)&&passaClasse('fat',classeLinha(l.cfop)));
   const soma=(rs,k)=>rs.reduce((a,r)=>a+(+r[k]||0),0);
@@ -105,12 +122,25 @@ function renderFaturamento(){
     const pc=cli==='todos'?'':cli.split(/\s+/)[0].toUpperCase();
     dev=je.linhas.filter(r=>{const c=String(r[iC]||'');return '12'.includes(c[0])&&['201','202','410','411'].includes(c.slice(1))&&noPeriodo('fat',String(r[iD]||r[iDg]||'').slice(0,10))&&(!pc||String(r[iN]||'').toUpperCase().includes(pc))}).reduce((a,r)=>a+(+r[iT]||0)+(+r[iI]||0),0)}
   else carregar('entradas').then(()=>{if(M.atual==='faturamento')rerender()}).catch(()=>{});
-  let h=`<div class="cards3 fat-kpis"><div class="card-k verde"><span>Faturamento</span><b>${brl0(rec)}</b><small class="muted">CFOPs de receita</small></div><div class="card-k"><span>Devoluções de clientes</span><b>${dev===null?'…':brl0(dev)}</b><small class="muted">Entradas com CFOP x201, x202, x410, x411</small></div><div class="card-k"><span>Faturamento líquido</span><b>${dev===null?'…':brl0(rec-dev)}</b><small class="muted">Faturamento menos devoluções</small></div></div>${grafFat(base)}
+  let h=`<div class="cards3 fat-kpis"><div class="card-k verde"><span>Faturamento</span><b>${brl0(rec)}</b><small class="muted">CFOPs de receita</small></div><div class="card-k"><span>Devoluções de clientes</span><b>${dev===null?'…':brl0(dev)}</b><small class="muted">Entradas com CFOP x201, x202, x410, x411</small></div><div class="card-k"><span>Faturamento líquido</span><b>${dev===null?'…':brl0(rec-dev)}</b><small class="muted">Faturamento menos devoluções</small></div></div>${grafFat(L.filter(l=>cli==='todos'||l.destNome===cli))}
   <div class="tools filtros">${periodoUI('fat')}${selUI('fat_cli',[['todos','Todos os clientes'],...PRINCIPAIS.map(([k,l])=>[clientes.find(c=>c.includes(k))||k,'★ '+l]),...clientes.map(c=>[c,c])],'Cliente')}${filtroClasseUI('fat')}${buscaUI('fat','Nota, produto, cliente')}</div>
-  <div class="tools"><div class="seg" role="group" aria-label="Visão">${[['itens','Itens das notas'],['cliente','Por cliente'],['produto','Por produto'],['mes','Por mês'],['cfop','Por CFOP']].map(([k,l])=>`<button data-fv="${k}" aria-pressed="${vis===k}">${l}</button>`).join('')}</div>
+  <div class="tools"><div class="seg" role="group" aria-label="Visão">${[['notas','Notas'],['itens','Itens das notas'],['cliente','Por cliente'],['produto','Por produto'],['mes','Por mês'],['cfop','Por CFOP']].map(([k,l])=>`<button data-fv="${k}" aria-pressed="${vis===k}">${l}</button>`).join('')}</div>
   <span class="small muted">${F.length.toLocaleString('pt-BR')} itens · R$ ${brl(soma(F,'total'))} · Qtd. ${num(soma(F,'q'),3)} · Fonte: Qive, notas emitidas, atualizado em ${dt(M.dados.faturamento.geradoEm.slice(0,10))}</span></div>`;
   const tipoCel=r=>{const t=tipoCfop(r.cfop);return `<span class="pill ${t.cl}" title="${esc(CFOP_DESC[r.cfop]||'')}">${t.t}</span>`};
-  if(vis==='itens'){
+  if(vis==='notas'){
+    /* Notas do período com o cliente de cada uma (pedido do Chai, 23/11/2026). Clicar na nota abre os produtos embaixo, um por vez. */
+    const g=new Map();for(const l of F){const o=g.get(l.chave)||{k:l.chave,data:l.data,nota:l.nota,serie:l.serie,cli:l.destNome,cnpj:l.destCnpj,natOp:l.natOp,cfop:l.cfop,total:0,itens:[]};o.total+=l.total;o.itens.push(l);g.set(l.chave,o)}
+    const R=[...g.values()];const aberto=ui('fatn_open',()=>new Set());
+    const doc=c=>{c=String(c||'');return c.length===14?c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5'):c.length===11?c.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/,'$1.$2.$3-$4'):c};
+    const cols=[{k:'data',l:'Emissão',f:r=>`<span class="seta">${aberto.has(r.k)?'▾':'›'}</span> ${dt(r.data)}`},{k:'nota',l:'Nota',v:r=>+r.nota||r.nota,cls:()=>'mono',f:r=>esc(String(+r.nota||r.nota))},
+      {k:'cli',l:'Cliente',cls:()=>'trunca',f:r=>`<span title="${esc(r.cli)}">${esc(r.cli)}</span><small class="muted fat-doc">${esc(doc(r.cnpj))}</small>`},
+      {k:'natOp',l:'Natureza',cls:()=>'trunca',f:r=>`<span class="small" title="${esc(r.natOp)}">${esc(r.natOp)}</span>`},{k:'_t',l:'Tipo',v:r=>tipoCfop(r.cfop).t,f:r=>tipoCel(r)},
+      {k:'nItens',l:'Itens',num:1,v:r=>r.itens.length,f:r=>r.itens.length},{k:'total',l:'Valor',num:1,f:r=>brl(r.total)}];
+    const det=r=>`<tr><td colspan="${cols.length}" class="detail"><div class="inner"><table><thead><tr><th>Código</th><th>Descrição</th><th>CFOP</th><th class="num">Qtd.</th><th>UM</th><th class="num">Vlr. unit.</th><th class="num">Vlr. total</th></tr></thead><tbody>${r.itens.map(i=>`<tr><td class="mono">${esc(i.cod)}</td><td>${esc(i.desc)}</td><td class="mono" title="${esc(CFOP_DESC[i.cfop]||'')}">${esc(i.cfop)}</td><td class="num">${num(i.q,3)}</td><td>${esc(i.un)}</td><td class="num">${num(i.unit,4)}</td><td class="num">${brl(i.total)}</td></tr>`).join('')}<tr class="tot"><td colspan="6"><b>Total da nota</b></td><td class="num"><b>${brl(r.total)}</b></td></tr></tbody></table></div></td></tr>`;
+    h+=tabela('fat_notas',cols,R,{ordem:'data',desc:true,porPagina:50,cls:'compacto fit',vazio:'Nenhuma nota com esse filtro.',
+      linha:r=>` data-fatnota="${esc(r.k)}" class="row" tabindex="0" aria-expanded="${aberto.has(r.k)}"`,depois:r=>aberto.has(r.k)?det(r):'',
+      total:rs=>`<td colspan="${cols.length-2}"><b>${rs.length.toLocaleString('pt-BR')} nota${rs.length===1?'':'s'}</b></td><td class="num"><b>${rs.reduce((a,r)=>a+r.itens.length,0).toLocaleString('pt-BR')}</b></td><td class="num"><b>${brl(soma(rs,'total'))}</b></td>`});
+  }else if(vis==='itens'){
     const FC=[{k:'data',l:'Emissão',f:r=>dt(r.data)},{k:'nota',l:'Nota',cls:()=>'mono'},{k:'destNome',l:'Cliente',oculta:1,cls:()=>'trunca'},
       {k:'cod',l:'Código',cls:()=>'mono'},{k:'desc',l:'Descrição',cls:()=>'trunca',f:r=>`<span title="${esc(r.desc)}">${esc(r.desc)}</span>`},
       {k:'_fin',l:'Financeiro',v:r=>classeLinha(r.cfop).fin,f:r=>SN(classeLinha(r.cfop).fin)},{k:'_est',l:'Estoque',v:r=>classeLinha(r.cfop).est,f:r=>SN(classeLinha(r.cfop).est)},
@@ -863,6 +893,8 @@ document.addEventListener('click',e=>{
   const mv=t.closest('[data-mcv]');if(mv){M.ui.mc_vis=mv.dataset.mcv;rerender();return}
   if(t.closest('#mcExport')){exportaMC();return}
   if(t.closest('input,select'))return;
+  const fn=t.closest('tr[data-fatnota]');if(fn){umaSo(ui('fatn_open',()=>new Set()),fn.dataset.fatnota);rerender();return}
+  const fc=t.closest('[data-fatbar]');if(fc){const [de,ate,mes]=fc.dataset.fatbar.split('|');Object.assign(ui('per_fat',()=>({})),mes?{modo:'mes',de,ate}:{modo:'int',de,ate});M.ui.fat_vis='notas';perMudou();document.querySelector('#v-faturamento .seg[aria-label="Visão"]')?.scrollIntoView({block:'start',behavior:'smooth'});return}
   const no=t.closest('tr[data-nfopen]');if(no){const s=ui('nfa_open',()=>new Set());const k=no.dataset.nfopen;umaSo(s,k);rerender();return}
   const ve=t.closest('[data-vxenc]');if(ve){vxEncerrar(ve.dataset.vxenc);return}
   const vo=t.closest('[data-vxopen]');if(vo){umaSo(ui('vx_open',()=>new Set()),vo.dataset.vxopen);M.ui.vx_modo='';M.vxErro='';M.vxVal='';rerender();return}
@@ -876,7 +908,7 @@ document.addEventListener('click',e=>{
   const fo=t.closest('[data-fpopen]');if(fo){const s=ui('fp_open',()=>new Set());const k=fo.dataset.fpopen;umaSo(s,k);rerender();return}
   const er=t.closest('tr[data-est]');if(er){const s=ui('est_open',()=>new Set());const k=er.dataset.est;umaSo(s,k);rerender();return}
 });
-document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('tr[data-est],tr[data-nfopen],[data-fpopen],[data-cnfopen]')){e.preventDefault();e.target.click()}});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('tr[data-est],tr[data-nfopen],tr[data-fatnota],[data-fatbar],[data-fpopen],[data-cnfopen]')){e.preventDefault();e.target.click()}});
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t.dataset.fpmp){const c=t.dataset.fpmp;salvaFicha(c,{mp:{...((M.form[c]||{}).mp||{}),[t.dataset.key]:t.value}});return}
