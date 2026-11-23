@@ -167,13 +167,17 @@ function renderFaturamento(){
 
 /* ---------- Faturamento › Formação de preço: margem de contribuição por produto (modelo da Formação de Preço do Gestão Vaeso, pedido do Chai, 23/11/2026) ----------
    Preço = preço médio faturado no período (CFOPs de receita) ou o preço digitado para simular (formacao/<cod>.precoSim).
-   Custo = ficha da Estruturas › Formação de preço: matéria-prima (kg), injeção (roteiro × R$ 70/h), embalagem e outros insumos.
+   Custo = ficha da Estruturas › Formação de preço: matéria-prima (kg), injeção (roteiro), embalagem e outros insumos.
+   Valores que valem só nesta aba (não mudam Custo NF entrada nem Estrutura):
+     config/fpvenda.mpKg[<MP>] = R$/kg; config/fpvenda.horaMaq = valor da hora máquina (padrão R$ 70);
+     formacao/<cod>.injOv[<peça>] = {cav, ciclo} (peças/hora = cavidades × 3600 ÷ ciclo); formacao/<cod>.embSim = embalagem por peça.
    Industrialização (mais da metade do valor em x124/x125): o material que o cliente envia (entradas x901) sai do custo.
    Impostos e frete: premissas em config/fpvenda. ICMS por dentro do preço; PIS e COFINS sobre (preço − ICMS); frete sobre o preço.
    MC = preço − impostos − custo − frete; MC % sobre o preço. Sem estrutura ou com custo incompleto: fora da MC média.
-   Ajustes do Chai (23/11/2026): sem comissão, sem textos explicativos, no máximo 2 casas, % ao lado do valor, linhas baixas, sem cliente no cabeçalho. */
+   Pedidos do Chai (23/11/2026): sem comissão, sem textos explicativos, no máximo 2 casas, % ao lado do valor, tabela inteira numa tela, gaveta lateral. */
 const FPV_GRUPOS=[['todos','Todos'],...PRINCIPAIS,['outros','Outros clientes']];
-function fpvPrem(){const c=M.fpv||{},d={icms:12,pis:1.65,cofins:7.6,frete:+cfg().fretePct||0,modo:'prem'};const o={};for(const k in d)o[k]=c[k]===undefined||c[k]===null||c[k]===''?d[k]:c[k];return o}
+const vazio=v=>v===undefined||v===null||v==='';
+function fpvPrem(){const c=M.fpv||{},d={icms:12,pis:1.65,cofins:7.6,frete:+cfg().fretePct||0,modo:'prem',horaMaq:HORA_MAQ};const o={};for(const k in d)o[k]=vazio(c[k])?d[k]:c[k];o.mpKg=c.mpKg||{};return o}
 /* Material do cliente: produtos das entradas com CFOP 1901/2901 (remessa para industrialização). */
 function materialCliente(){if(M._fpvCli)return M._fpvCli;const j=M.dados.entradas,s=new Set();if(!j)return s;
   const iC=j.colunas.indexOf('Cod. Fiscal'),iP=j.colunas.indexOf('Produto');for(const r of j.linhas)if(['1901','2901'].includes(String(r[iC])))s.add(String(r[iP]).trim());return M._fpvCli=s}
@@ -186,18 +190,26 @@ function fpvLinhas(){
     return {...o,cliP:cp,grupo:pr?pr[0]:'outros',vae:[...o.cli.keys()].every(ehVaeso),indust:o.ind>o.fat/2}});
 }
 function fpvCalc(o,p){
-  const f=ficha(o.cod,o.vae,o.indust?materialCliente():null);let mp=0,ins=0;const mps=[];
-  for(const g of f.grupos)for(const l of g.linhas){if(l.um==='KG')mps.push({desc:descDe(l.mp),g:l.q*1000,unit:l.unit,val:l.val,cl:l.cl,zv:l.zv});if(l.val!==null){if(l.um==='KG')mp+=l.val;else ins+=l.val}}
-  const inj=formacao(o.cod,o.vae).inj.filter(r=>r.injeta);
-  const custo=mp+ins+f.vInj+f.vEmb;
-  const motivos=[];if(f.temE){if(f.falta)motivos.push(f.falta+' item'+(f.falta===1?'':'s')+' sem custo');if(!f.vInj)motivos.push('sem roteiro de injeção')}
+  const f=ficha(o.cod,o.vae,o.indust?materialCliente():null),ov=M.form[o.cod]||{};
+  let mp=0,ins=0,falta=f.falta;const mps=[];
+  for(const g of f.grupos)for(const l of g.linhas){
+    if(l.um==='KG'){const fixo=l.cl||l.zv,k=p.mpKg[l.mp],alt=!fixo&&!vazio(k);let unit=l.unit;if(alt){if(unit===null)falta--;unit=+k}
+      const val=unit===null?null:l.q*unit;mps.push({item:g.item,cod:l.mp,desc:descDe(l.mp),g:l.q*1000,unit,val,cl:l.cl,zv:l.zv,alt});if(val!==null)mp+=val}
+    else if(l.val!==null)ins+=l.val}
+  const io=ov.injOv||{};
+  const injs=formacao(o.cod,o.vae).inj.filter(r=>r.injeta).map(r=>{const e=io[r.peca]||{};const cav=vazio(e.cav)?r.cav:+e.cav,ciclo=vazio(e.ciclo)?r.ciclo:+e.ciclo,alt=!vazio(e.cav)||!vazio(e.ciclo);
+    const ph=alt?(ciclo>0?cav*3600/ciclo:0):r.ph;return {...r,cav,ciclo,ph,alt,custo:ph?r.mult/ph*p.horaMaq:0}});
+  const inj=injs.reduce((a,r)=>a+r.custo,0);
+  const embSim=!vazio(ov.embSim),emb=embSim?+ov.embSim:f.vEmb;
+  const custo=mp+ins+inj+emb;
+  const motivos=[];if(f.temE){if(falta>0)motivos.push(falta+' item'+(falta===1?'':'s')+' sem custo');if(!inj)motivos.push('sem roteiro de injeção')}
   const st=!f.temE?'sem':motivos.length?'parcial':'ok';
-  const pm=o.fat/o.q,sim=+(M.form[o.cod]?.precoSim)||0,preco=sim||pm;
+  const pm=o.fat/o.q,sim=+ov.precoSim||0,preco=sim||pm;
   let icms,pis,cof;
   if(p.modo==='xml'){icms=preco*o.icms/o.fat;pis=preco*o.pis/o.fat;cof=preco*o.cofins/o.fat}
   else{icms=preco*p.icms/100;pis=(preco-icms)*p.pis/100;cof=(preco-icms)*p.cofins/100}
   const imp=icms+pis+cof,liq=preco-imp,frete=preco*p.frete/100,tot=custo+frete,mc=liq-tot;
-  return {...o,f,mps,injs:inj,mp,ins,inj:f.vInj,emb:f.vEmb,embIns:f.vEmb+ins,custo,st,motivos,pm,sim,preco,icms,pis,cof,imp,liq,frete,tot,mc,mcp:preco?mc/preco:0};
+  return {...o,f,mps,injs,mp,ins,inj,emb,embCalc:f.vEmb,embSim,custo,st,motivos,pm,sim,preco,icms,pis,cof,imp,liq,frete,tot,mc,mcp:preco?mc/preco:0};
 }
 function renderFpVenda(){
   const box=$('v-fpvenda');
@@ -210,6 +222,7 @@ function renderFpVenda(){
   M._fpvExport=()=>R;
   const pc=v=>isFinite(v)?(v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}).replace('-','−')+'%':'–';
   const pc2=v=>(+v||0).toLocaleString('pt-BR',{maximumFractionDigits:2})+'%';
+  const v2=v=>Math.abs(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
   const cor=v=>v===null?'':v<0?' neg':' pos';
   const pin=(k,l)=>`<label class="fpv-pin"><span>${l}</span><span class="pct-in"><input class="custo" type="text" inputmode="decimal" id="fpvp_${k}" data-fpvprem="${k}" value="${String(p[k]).replace('.',',')}" aria-label="${l} em %"${p.modo==='xml'&&['icms','pis','cofins'].includes(k)?' disabled':''}> %</span></label>`;
   let h=`<div class="tools fpv-topo"><div class="seg" role="group" aria-label="Grupo de clientes">${FPV_GRUPOS.map(([k,l])=>`<button type="button" data-uiset="fpv_grupo" data-v="${k}" aria-pressed="${gr===k}">${esc(l)}</button>`).join('')}</div>
@@ -218,40 +231,52 @@ function renderFpVenda(){
   <div class="cards3 fpv-kpis"><div class="card-k verde"><span>MC média ponderada</span><b class="${cor(mcPond)}">${mcPond===null?'–':pc(mcPond)}</b><small class="muted">Pelo faturamento do período · média simples <b>${mcSimp===null?'–':pc(mcSimp)}</b></small></div>
   <div class="card-k"><span>Faturamento do período</span><b>${brl0(fatT)}</b><small class="muted">${esc(perTexto(ui('per_fpv',()=>({}))))} · ${R.length} produto${R.length===1?'':'s'}</small></div>
   <div class="card-k"><span>Produtos com custo completo</span><b>${ok.length} de ${R.length}</b><small class="muted">${brl0(fatOk)} do faturamento entra na MC média</small></div></div>
-  <details class="fpv-prem"${ui('fpv_premab',false)?' open':''}><summary>Premissas <span class="small muted">ICMS ${p.modo==='xml'?'das notas':pc2(p.icms)} · PIS ${p.modo==='xml'?'das notas':pc2(p.pis)} · COFINS ${p.modo==='xml'?'das notas':pc2(p.cofins)} · Frete ${pc2(p.frete)}</span></summary>
+  <details class="fpv-prem"${ui('fpv_premab',false)?' open':''}><summary>Premissas <span class="small muted">ICMS ${p.modo==='xml'?'das notas':pc2(p.icms)} · PIS ${p.modo==='xml'?'das notas':pc2(p.pis)} · COFINS ${p.modo==='xml'?'das notas':pc2(p.cofins)} · Frete ${pc2(p.frete)} · Hora máquina R$ ${v2(p.horaMaq)}</span></summary>
   <div class="fpv-prem-in"><div class="seg" role="group" aria-label="Impostos">${[['prem','Impostos pelas premissas'],['xml','Impostos das notas (XML)']].map(([k,l])=>`<button type="button" data-fpvmodo="${k}" aria-pressed="${p.modo===k}">${l}</button>`).join('')}</div>
   ${pin('icms','ICMS')}${pin('pis','PIS')}${pin('cofins','COFINS')}${pin('frete','Frete s/ vendas')}</div></details>`;
   if(!R.length){box.innerHTML=h+esperando('Nenhum produto faturado com esse filtro.');return}
-  const v2=v=>Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
   const val=(v,P,o={})=>`<td class="num${o.cls||''}"><span class="fpv-v">${o.neg&&v>0.005?'−':''}${v2(v)}</span><small>${pc(P?v/P:NaN)}</small></td>`;
   const semC=r=>`<td class="num fpv-semc">${r.st==='sem'?'Sem custo':'–'}</td>`;
   const tg=(k,l)=>`<button type="button" class="fpv-tg" data-fpvexp="${k}" aria-expanded="${exp.has(k)}"><i aria-hidden="true">${exp.has(k)?'▾':'▸'}</i>${l}</button>`;
   const lin=(rot,cel,cls='')=>`<tr class="${cls}"><th scope="row" class="fpv-rot">${rot}</th>${R.map(cel).join('')}</tr>`;
-  const qd=ui('fpv_q',null);
   const ini=d=>esc(String(d||'').replace(/[^A-Za-zÀ-ú0-9 ]/g,' ').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?');
   const status=r=>r.st==='ok'?'':r.st==='sem'?'<span class="pill p-stop">Sem custo</span>':`<span class="pill p-warn" title="${esc(r.motivos.join(' · '))}">Parcial</span>`;
+  const qd=ui('fpv_q',null);
   let t=`<div class="fpv-wrap"><table class="fpv"><thead><tr><th class="fpv-rot fpv-canto">Produto</th>${R.map(r=>`<th class="fpv-prod" scope="col"><div class="fpv-cab"><span class="fpv-ic" aria-hidden="true">${ini(r.desc)}</span><b title="${esc(r.desc)}">${esc(r.desc)}</b></div><small class="mono" title="${esc([...r.cli.keys()].join(', '))}">${esc(r.cod)}</small><span class="fpv-tags">${r.indust?'<span class="pill p-info" title="Mais da metade do valor em CFOP x124/x125. O material que o cliente envia (remessa x901) não entra no custo.">Industrialização</span>':''}${status(r)}</span></th>`).join('')}</tr></thead><tbody>`;
   t+=lin('Preço de venda',(r,i)=>`<td class="num fpv-preco"><input class="custo${r.sim?' manual':''}" type="text" inputmode="decimal" id="fpvpr_${i}" data-fpvpreco="${esc(r.cod)}" value="${v2(r.preco)}" title="Preço médio faturado: ${v2(r.pm)} · ${num(r.q,0)} ${esc((r.un||'').toLowerCase())}" aria-label="Preço de venda de ${esc(r.desc)}">${r.sim?`<button type="button" class="fpv-lk" data-fpvlimpa="${esc(r.cod)}" title="Voltar ao preço médio faturado (${v2(r.pm)})" aria-label="Voltar ao preço médio">↺</button>`:''}</td>`,'fpv-l-preco');
   t+=lin(`${tg('imp','(−) Impostos')} <span class="fpv-pp">${p.modo==='xml'?'notas':pc((p.icms+(100-p.icms)*(p.pis+p.cofins)/100)/100)}</span>`,r=>val(r.imp,r.preco,{neg:1}));
   if(exp.has('imp'))t+=lin('ICMS',r=>val(r.icms,r.preco,{neg:1}),'fpv-sub')+lin('PIS',r=>val(r.pis,r.preco,{neg:1}),'fpv-sub')+lin('COFINS',r=>val(r.cof,r.preco,{neg:1}),'fpv-sub');
   t+=lin('(=) Preço líquido',r=>val(r.liq,r.preco),'fpv-forte');
-  const clic=(r,k,v)=>r.st==='sem'?semC(r):`<td class="num fpv-clic${qd&&qd.cod===r.cod&&qd.k===k?' on':''}" data-fpvq="${k}|${esc(r.cod)}" role="button" tabindex="0" title="Ver o quadro de ${k==='mp'?'matéria-prima':'injeção'} deste produto"><span class="fpv-v">${v>0.005?'−':''}${v2(v)}</span><small>${pc(r.preco?v/r.preco:NaN)}</small></td>`;
-  t+=lin('Matéria-prima <span class="fpv-pp">clique no valor</span>',r=>clic(r,'mp',r.mp));
-  t+=lin('Custo injeção <span class="fpv-pp">clique no valor</span>',r=>clic(r,'inj',r.inj));
-  t+=lin('Embalagem e outros',r=>r.st==='sem'?semC(r):val(r.embIns,r.preco,{neg:1}));
+  const clic=(r,k,v)=>r.st==='sem'?semC(r):`<td class="num fpv-clic${qd&&qd.cod===r.cod&&qd.k===k?' on':''}" data-fpvq="${k}|${esc(r.cod)}" role="button" tabindex="0" title="Abrir ${k==='mp'?'a matéria-prima':'o custo de injeção'} deste produto"><span class="fpv-v">${v>0.005?'−':''}${v2(v)}</span><small>${pc(r.preco?v/r.preco:NaN)}</small></td>`;
+  t+=lin('Matéria-prima',r=>clic(r,'mp',r.mp));
+  t+=lin('Custo injeção',r=>clic(r,'inj',r.inj));
+  t+=lin('Embalagem',(r,i)=>r.st==='sem'?semC(r):`<td class="num fpv-preco"><input class="custo${r.embSim?' manual':''}" type="text" inputmode="decimal" id="fpve_${i}" data-fpvemb="${esc(r.cod)}" value="${v2(r.emb)}" title="Calculada pela estrutura: ${v2(r.embCalc)}" aria-label="Embalagem por peça de ${esc(r.desc)}">${r.embSim?`<button type="button" class="fpv-lk" data-fpvembl="${esc(r.cod)}" title="Voltar à embalagem calculada (${v2(r.embCalc)})" aria-label="Voltar à embalagem calculada">↺</button>`:''}<small>${pc(r.preco?r.emb/r.preco:NaN)}</small></td>`);
+  t+=lin('Outros insumos',r=>r.st==='sem'?semC(r):val(r.ins,r.preco,{neg:1}));
   t+=lin(`Frete s/ vendas <span class="fpv-pp">${pc2(p.frete)}</span>`,r=>val(r.frete,r.preco,{neg:1}));
   t+=lin('Total custos',r=>r.st==='sem'?semC(r):val(r.tot,r.preco,{neg:1}),'fpv-forte');
   t+=lin('MC',r=>r.st==='sem'?semC(r):`<td class="num fpv-mc${r.mc<0?' neg':' pos'}${r.st==='parcial'?' parcial':''}"${r.st==='parcial'?` title="Custo parcial: ${esc(r.motivos.join(' · '))}"`:''}><span class="fpv-v">${r.mc<-0.005?'−':''}${v2(r.mc)}</span><b>${pc(r.mcp)}</b></td>`,'fpv-l-mc');
   t+='</tbody></table></div>';
-  /* Quadro do produto clicado: composição da matéria-prima ou processo de injeção. */
+  /* Quadro de baixo: todas as matérias-primas com o R$/kg usado aqui e a hora máquina. Vale só nesta aba. */
+  const usoMp=new Map();for(const r of R)for(const x of r.mps)if(!x.cl&&!x.zv)usoMp.set(x.cod,(usoMp.get(x.cod)||0)+1);
+  const qb=ui('b_fpvmp','');
+  const MPs=materiasPrimas().map(c=>({c,d:descDe(c),compra:custoComp(c)?.v??null,alt:p.mpKg[c],n:usoMp.get(c)||0})).filter(x=>casa(`${x.c} ${x.d}`,qb)).sort((a,b)=>b.n-a.n||COLL.compare(a.d,b.d));
+  t+=`<div class="fpv-mat"><div class="fpv-mat-cab"><h3>Materiais e hora máquina</h3><label class="busca"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg><input type="search" id="mb_fpvmp" data-mb="fpvmp" placeholder="Buscar material…" value="${esc(qb)}" aria-label="Buscar material"></label></div>
+  <div class="scroll fpv-mat-l"><table class="compacto"><thead><tr><th>Código</th><th>Material</th><th class="num">Última compra R$/kg</th><th class="num">R$/kg na formação</th><th class="num">Produtos na tela</th></tr></thead><tbody>${MPs.map(x=>`<tr><td class="mono">${esc(x.c)}</td><td>${esc(x.d)}</td><td class="num">${x.compra===null?'<span class="txt-stop">sem custo</span>':v2(x.compra)}</td><td class="num"><input class="custo${vazio(x.alt)?'':' manual'}" type="text" inputmode="decimal" id="fpvkg_${esc(x.c)}" data-fpvkg="${esc(x.c)}" value="${vazio(x.alt)?'':v2(x.alt)}" placeholder="${x.compra===null?'preencher':v2(x.compra)}" aria-label="R$ por kg de ${esc(x.d)}"></td><td class="num">${x.n||''}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">Nenhum material com essa busca.</td></tr>'}</tbody></table></div>
+  <div class="fpv-hora"><label class="fpv-pin"><span>Valor da hora máquina (todos os itens)</span><span class="pct-in">R$ <input class="custo" type="text" inputmode="decimal" id="fpvp_horaMaq" data-fpvprem="horaMaq" value="${v2(p.horaMaq)}" aria-label="Valor da hora máquina em reais"></span></label></div>
+  <p class="small muted">Valores digitados aqui mudam só a Formação de preço. Em branco, vale a última compra.</p></div>`;
+  /* Gaveta lateral do produto clicado: matéria-prima ou injeção. */
   const rq=qd&&R.find(r=>r.cod===qd.cod);
-  if(rq){const tit=`<div class="fpv-qcab"><b>${qd.k==='mp'?'Matéria-prima':'Custo injeção'} · ${esc(rq.desc)}</b> <span class="mono small muted">${esc(rq.cod)}</span><span class="cresce"></span><button type="button" class="bt" data-fpvq="${qd.k}|${esc(rq.cod)}">Fechar</button></div>`;
-    if(qd.k==='mp')t+=`<div class="fpv-quadro" id="fpvQuadro">${tit}<div class="scroll"><table class="compacto"><thead><tr><th>Tipo de MP</th><th class="num">Peso (g)</th><th class="num">Valor/kg</th><th class="num">Custo da MP</th></tr></thead><tbody>${rq.mps.length?rq.mps.map(x=>`<tr><td>${esc(x.desc)}${x.cl?' <span class="pill p-info" title="Enviada pelo cliente (remessa para industrialização): sem custo">cliente</span>':x.zv?' <span class="pill p-info">Vaeso</span>':''}</td><td class="num">${num(x.g,2)}</td><td class="num">${x.unit===null?'<span class="txt-stop">sem custo</span>':v2(x.unit)}</td><td class="num">${x.val===null?'–':v2(x.val)}</td></tr>`).join(''):'<tr><td colspan="4" class="empty">Sem matéria-prima em kg na estrutura.</td></tr>'}<tr class="tot"><td><b>Total</b></td><td class="num"><b>${num(rq.mps.reduce((a,x)=>a+x.g,0),2)}</b></td><td></td><td class="num"><b>${v2(rq.mp)}</b></td></tr></tbody></table></div></div>`;
-    else t+=`<div class="fpv-quadro" id="fpvQuadro">${tit}<div class="scroll"><table class="compacto"><thead><tr><th>Peça</th><th>Molde</th><th class="num">Cavidades</th><th class="num">Ciclo (s)</th><th class="num">Peças/hora</th><th class="num">Qtd. por produto</th><th class="num">Valor hora máquina</th><th class="num">Custo por peça</th></tr></thead><tbody>${rq.injs.length?rq.injs.map(x=>`<tr><td>${esc(x.desc||x.peca)} <span class="mono small muted">${esc(x.peca)}</span></td><td class="mono">${esc(x.molde||'')}</td><td class="num">${num(x.cav,0)}</td><td class="num">${num(x.ciclo,0)}</td><td class="num">${num(x.ph,0)}</td><td class="num">${num(x.mult,2)}</td><td class="num">${v2(HORA_MAQ)}</td><td class="num">${v2(x.custo)}</td></tr>`).join(''):'<tr><td colspan="8" class="empty">Sem roteiro de injeção.</td></tr>'}<tr class="tot"><td colspan="7"><b>Total por produto</b></td><td class="num"><b>${v2(rq.inj)}</b></td></tr></tbody></table></div></div>`}
+  if(rq){const peso=rq.mps.reduce((a,x)=>a+x.g,0);
+    const cab=`<div class="fpv-gav-cab"><div><small class="muted">${esc(rq.cod)} · ${qd.k==='mp'?num(peso,1)+' g de matéria-prima':num(rq.injs.length,0)+' processo'+(rq.injs.length===1?'':'s')+' de injeção'}</small><h3>${qd.k==='mp'?'Matéria-prima':'Custo injeção'} · ${esc(rq.desc)}</h3></div><button type="button" class="fpv-x" data-fpvfecha="1" aria-label="Fechar">×</button></div>`;
+    let corpo;
+    if(qd.k==='mp')corpo=`<div class="scroll"><table class="compacto"><thead><tr><th>Item</th><th>Polímero</th><th class="num">Peso (g)</th><th class="num">R$ por kg</th><th class="num">Total</th></tr></thead><tbody>${rq.mps.length?rq.mps.map(x=>`<tr><td>${esc(x.item)}</td><td>${esc(x.desc)}${x.cl?' <span class="pill p-info" title="Enviado pelo cliente (remessa para industrialização): sem custo">cliente</span>':x.zv?' <span class="pill p-info">Vaeso</span>':x.alt?' <span class="pill p-info" title="R$/kg digitado no quadro Materiais">formação</span>':''}</td><td class="num">${num(x.g,2)}</td><td class="num">${x.unit===null?'<span class="txt-stop">sem custo</span>':v2(x.unit)}</td><td class="num">${x.val===null?'–':v2(x.val)}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">Sem matéria-prima em kg na estrutura.</td></tr>'}<tr class="tot"><td colspan="2"><b>Custo de matéria-prima</b></td><td class="num"><b>${num(peso,2)}</b></td><td></td><td class="num"><b>${v2(rq.mp)}</b></td></tr></tbody></table></div><p class="small muted">O R$ por kg vem do quadro Materiais, no fim da tela. Mudar lá muda esta conta e a margem.</p>`;
+    else{const io=(M.form[rq.cod]||{}).injOv||{};
+      corpo=`<div class="scroll"><table class="compacto"><thead><tr><th>Peça</th><th>Molde</th><th class="num">Cavidades</th><th class="num">Ciclo (s)</th><th class="num">Peças/hora</th><th class="num">Qtd.</th><th class="num">Hora máq.</th><th class="num">Custo/peça</th></tr></thead><tbody>${rq.injs.length?rq.injs.map((x,i)=>`<tr><td>${esc(x.desc||x.peca)}<small class="mono muted fpv-blk">${esc(x.peca)}</small></td><td class="mono">${esc(x.molde||'')}</td><td class="num"><input class="custo fpv-in-s${vazio(io[x.peca]?.cav)?'':' manual'}" type="text" inputmode="numeric" id="fpvi_${i}_cav" data-fpvinj="${esc(rq.cod)}|${esc(x.peca)}|cav" value="${num(x.cav,2)}" aria-label="Cavidades de ${esc(x.peca)}"></td><td class="num"><input class="custo fpv-in-s${vazio(io[x.peca]?.ciclo)?'':' manual'}" type="text" inputmode="decimal" id="fpvi_${i}_ciclo" data-fpvinj="${esc(rq.cod)}|${esc(x.peca)}|ciclo" value="${num(x.ciclo,2)}" aria-label="Ciclo em segundos de ${esc(x.peca)}">${x.alt?`<button type="button" class="fpv-lk" data-fpvinjl="${esc(rq.cod)}|${esc(x.peca)}" title="Voltar ao roteiro" aria-label="Voltar ao roteiro">↺</button>`:''}</td><td class="num">${num(x.ph,0)}</td><td class="num">${num(x.mult,2)}</td><td class="num">${v2(p.horaMaq)}</td><td class="num">${v2(x.custo)}</td></tr>`).join(''):'<tr><td colspan="8" class="empty">Sem roteiro de injeção.</td></tr>'}<tr class="tot"><td colspan="7"><b>Custo injeção por produto</b></td><td class="num"><b>${v2(rq.inj)}</b></td></tr></tbody></table></div><p class="small muted">Peças/hora = cavidades × 3.600 ÷ ciclo. Cavidades e ciclo mudados aqui valem só para este produto nesta aba. A hora máquina fica no quadro Materiais, no fim da tela.</p>`}
+    t+=`<div class="fpv-fundo" data-fpvfecha="1"></div><aside class="fpv-gav" role="dialog" aria-modal="true" aria-label="${qd.k==='mp'?'Matéria-prima':'Custo injeção'} de ${esc(rq.desc)}">${cab}${corpo}</aside>`}
   box.innerHTML=h+t;
 }
 function exportaFpv(){const R=M._fpvExport&&M._fpvExport();if(!R)return;
-  const C=[['Código',r=>r.cod],['Descrição',r=>r.desc],['Cliente principal',r=>r.cliP],['Operação',r=>r.indust?'Industrialização':'Venda'],['Situação do custo',r=>r.st==='ok'?'Completo':r.st==='sem'?'Sem custo':'Parcial: '+r.motivos.join(', ')],['Qtd. período',r=>r.q],['Faturamento período',r=>r.fat],['Preço médio',r=>r.pm],['Preço de venda',r=>r.preco],['ICMS',r=>r.icms],['PIS',r=>r.pis],['COFINS',r=>r.cof],['Impostos',r=>r.imp],['Preço líquido',r=>r.liq],['Matéria-prima',r=>r.mp],['Custo injeção',r=>r.inj],['Embalagem e outros',r=>r.embIns],['Custo do produto',r=>r.custo],['Frete',r=>r.frete],['Total custos',r=>r.tot],['MC R$',r=>r.st==='sem'?'':r.mc],['MC %',r=>r.st==='sem'?'':Math.round(r.mcp*1000)/10]];
+  const C=[['Código',r=>r.cod],['Descrição',r=>r.desc],['Cliente principal',r=>r.cliP],['Operação',r=>r.indust?'Industrialização':'Venda'],['Situação do custo',r=>r.st==='ok'?'Completo':r.st==='sem'?'Sem custo':'Parcial: '+r.motivos.join(', ')],['Qtd. período',r=>r.q],['Faturamento período',r=>r.fat],['Preço médio',r=>r.pm],['Preço de venda',r=>r.preco],['ICMS',r=>r.icms],['PIS',r=>r.pis],['COFINS',r=>r.cof],['Impostos',r=>r.imp],['Preço líquido',r=>r.liq],['Matéria-prima',r=>r.mp],['Custo injeção',r=>r.inj],['Embalagem',r=>r.emb],['Outros insumos',r=>r.ins],['Custo do produto',r=>r.custo],['Frete',r=>r.frete],['Total custos',r=>r.tot],['MC R$',r=>r.st==='sem'?'':r.mc],['MC %',r=>r.st==='sem'?'':Math.round(r.mcp*1000)/10]];
   const cel=v=>typeof v==='number'?String(Math.round(v*100)/100).replace('.',','):'"'+String(v??'').replace(/"/g,'""')+'"';
   const lin=[C.map(c=>c[0]).join(';'),...R.map(r=>C.map(c=>cel(c[1](r))).join(';'))];
   baixaCsv('formacao-preco-mc.csv',String.fromCharCode(65279)+lin.join(String.fromCharCode(13,10)))}
@@ -600,6 +625,8 @@ async function salvaFicha(cod,patch,msg='Ficha salva.'){
   try{await S.db.doc('formacao/'+String(cod).replace(/[^A-Za-z0-9_:.-]/g,'-')).set(atual);toast(msg)}catch{toast('Não foi salvo. Tente novamente.')}
 }
 
+/* Fecha a gaveta lateral da Formação de preço e devolve o foco à célula clicada. */
+function fpvFecha(){M.ui.fpv_q=null;rerender();const v=M._fpvVolta;if(v)document.querySelector(`td[data-fpvq="${CSS.escape(v)}"]`)?.focus()}
 /* Premissas da Faturamento › Formação de preço (config/fpvenda). */
 async function salvaFpv(patch){
   const atual={...(M.fpv||{}),...patch,em:new Date().toISOString()};M.fpv=atual;rerender();
@@ -995,7 +1022,10 @@ document.addEventListener('click',e=>{
   if(t.closest('#fpvExcel')){exportaFpv();return}
   if(t.closest('#fpvPdf')){window.print();return}
   const fx=t.closest('[data-fpvexp]');if(fx){const s=ui('fpv_exp',()=>new Set());const k=fx.dataset.fpvexp;s.has(k)?s.delete(k):s.add(k);rerender();document.querySelector(`[data-fpvexp="${k}"]`)?.focus();return}
-  const fq=t.closest('[data-fpvq]');if(fq){const [k,cod]=fq.dataset.fpvq.split('|');const a=M.ui.fpv_q;const abre=!(a&&a.k===k&&a.cod===cod);M.ui.fpv_q=abre?{k,cod}:null;rerender();if(abre)$('fpvQuadro')?.scrollIntoView({block:'nearest',behavior:'smooth'});return}
+  const fq=t.closest('[data-fpvq]');if(fq){const [k,cod]=fq.dataset.fpvq.split('|');const a=M.ui.fpv_q;const abre=!(a&&a.k===k&&a.cod===cod);M.ui.fpv_q=abre?{k,cod}:null;M._fpvVolta=fq.dataset.fpvq;rerender();if(abre)document.querySelector('.fpv-gav .fpv-x')?.focus();return}
+  if(t.closest('[data-fpvfecha]')){fpvFecha();return}
+  const fe=t.closest('[data-fpvembl]');if(fe){salvaFicha(fe.dataset.fpvembl,{embSim:''},'Embalagem calculada de volta.');return}
+  const fi=t.closest('[data-fpvinjl]');if(fi){const [cod,peca]=fi.dataset.fpvinjl.split('|');const io={...((M.form[cod]||{}).injOv||{})};delete io[peca];salvaFicha(cod,{injOv:io},'Cavidades e ciclo do roteiro de volta.');return}
   const fl=t.closest('[data-fpvlimpa]');if(fl){salvaFicha(fl.dataset.fpvlimpa,{precoSim:''},'Preço médio de volta.');return}
   const fm=t.closest('[data-fpvmodo]');if(fm){salvaFpv({modo:fm.dataset.fpvmodo});return}
   if(t.closest('input,select'))return;
@@ -1014,11 +1044,15 @@ document.addEventListener('click',e=>{
   const fo=t.closest('[data-fpopen]');if(fo){const s=ui('fp_open',()=>new Set());const k=fo.dataset.fpopen;umaSo(s,k);rerender();return}
   const er=t.closest('tr[data-est]');if(er){const s=ui('est_open',()=>new Set());const k=er.dataset.est;umaSo(s,k);rerender();return}
 });
-document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('tr[data-est],tr[data-nfopen],tr[data-fatnota],[data-fatbar],[data-fpopen],[data-cnfopen],td[data-fpvq]')){e.preventDefault();e.target.click()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&M.atual==='fpvenda'&&M.ui.fpv_q){fpvFecha();return}if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('tr[data-est],tr[data-nfopen],tr[data-fatnota],[data-fatbar],[data-fpopen],[data-cnfopen],td[data-fpvq]')){e.preventDefault();e.target.click()}});
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t.dataset.fpvpreco){const raw=t.value.trim();const v=raw===''?'':+raw.replace(/\./g,'').replace(',','.');if(raw!==''&&!(isFinite(v)&&v>0)){toast('Preço inválido. Use números, por exemplo 12,50.');return}salvaFicha(t.dataset.fpvpreco,{precoSim:v},v===''?'Preço médio de volta.':'Preço para simular salvo.');return}
-  if(t.dataset.fpvprem){const raw=t.value.trim();const v=raw===''?'':+raw.replace(',','.');if(raw!==''&&!(isFinite(v)&&v>=0&&v<100)){toast('Percentual inválido.');return}salvaFpv({[t.dataset.fpvprem]:v});return}
+  if(t.dataset.fpvprem){const k=t.dataset.fpvprem,raw=t.value.trim();const v=raw===''?'':+(k==='horaMaq'?raw.replace(/\./g,''):raw).replace(',','.');if(raw!==''&&!(isFinite(v)&&v>=0&&(k==='horaMaq'?v<100000:v<100))){toast(k==='horaMaq'?'Valor inválido.':'Percentual inválido.');return}salvaFpv({[k]:v});return}
+  const numBr=raw=>raw===''?'':+raw.replace(/\./g,'').replace(',','.');
+  if(t.dataset.fpvkg){const v=numBr(t.value.trim());if(v!==''&&!(isFinite(v)&&v>=0)){toast('Valor inválido. Use números, por exemplo 12,50.');return}const m={...(fpvPrem().mpKg)};if(v==='')delete m[t.dataset.fpvkg];else m[t.dataset.fpvkg]=v;salvaFpv({mpKg:m});return}
+  if(t.dataset.fpvemb){const v=numBr(t.value.trim());if(v!==''&&!(isFinite(v)&&v>=0)){toast('Valor inválido. Use números, por exemplo 0,05.');return}salvaFicha(t.dataset.fpvemb,{embSim:v},v===''?'Embalagem calculada de volta.':'Embalagem salva.');return}
+  if(t.dataset.fpvinj){const [cod,peca,campo]=t.dataset.fpvinj.split('|');const v=numBr(t.value.trim());if(v!==''&&!(isFinite(v)&&v>0)){toast('Valor inválido.');return}const io={...((M.form[cod]||{}).injOv||{})};io[peca]={...(io[peca]||{}),[campo]:v};salvaFicha(cod,{injOv:io},'Processo salvo.');return}
   if(t.dataset.fpmp){const c=t.dataset.fpmp;salvaFicha(c,{mp:{...((M.form[c]||{}).mp||{}),[t.dataset.key]:t.value}});return}
   if(t.dataset.fpf){const v=t.dataset.campo==='tipo'?t.value:Math.max(0,Math.round(+t.value||0));salvaFicha(t.dataset.fpf,{[t.dataset.campo]:v});return}
   if(t.dataset.fpm){const v=Math.max(0,Math.min(90,+String(t.value).replace(',','.')||0));M.ui.fp_margem=v;rerender();return}
@@ -1052,14 +1086,14 @@ document.addEventListener('input',e=>{const t=e.target;if(t.dataset?.mb){M.ui['b
 /* custos manuais e DRE salvos no banco */
 (function esperaDb(){if(!S.db){setTimeout(esperaDb,500);return}
   S.db.collection('custos').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.custosManuais=o;if(['estrutura','mc','dre','produtos','formacao','custonf','fpvenda'].includes(M.atual)&&!(document.activeElement?.dataset?.custo)&&!(document.activeElement?.dataset?.itcampo))rerender()},()=>{});
-  S.db.collection('formacao').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.form=o;if((M.atual==='formacao'||M.atual==='fpvenda')&&!document.activeElement?.dataset?.fpf&&!document.activeElement?.dataset?.fpmp&&!document.activeElement?.dataset?.fpvpreco)rerender()},()=>{});
+  S.db.collection('formacao').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.form=o;if((M.atual==='formacao'||M.atual==='fpvenda')&&!document.activeElement?.dataset?.fpf&&!document.activeElement?.dataset?.fpmp&&!document.activeElement?.dataset?.fpvpreco&&!document.activeElement?.dataset?.fpvemb&&!document.activeElement?.dataset?.fpvinj)rerender()},()=>{});
   S.db.collection('classif').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.classif=o;if(!document.activeElement?.dataset?.cls)rerender()},()=>{});
   S.db.doc('config/categorias').onSnapshot(s=>{M.cats=s.exists?(s.data().lista||[]):[];if(['forn','nfe'].includes(M.atual))rerender()},()=>{});
   S.db.collection('vaeso_ops').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxOps=o;M.vxPronto=true;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{M.vxPronto=true;if(M.atual==='pcpvaeso')rerender()});
   S.db.collection('vaeso_prod').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxProd=o;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
   S.db.doc('meta/vaeso_sync').onSnapshot(s=>{M.vxMeta=s.exists?s.data():null;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
   S.db.doc('config/contabilidade').onSnapshot(s=>{M.config=s.exists?s.data():{};if(['mc','dre','fpvenda'].includes(M.atual)&&!(document.activeElement?.dataset?.cfg))rerender()},()=>{});
-  S.db.doc('config/fpvenda').onSnapshot(s=>{M.fpv=s.exists?s.data():{};if(M.atual==='fpvenda'&&!document.activeElement?.dataset?.fpvprem)rerender()},()=>{});
+  S.db.doc('config/fpvenda').onSnapshot(s=>{M.fpv=s.exists?s.data():{};if(M.atual==='fpvenda'&&!document.activeElement?.dataset?.fpvprem&&!document.activeElement?.dataset?.fpvkg)rerender()},()=>{});
   S.db.collection('dre').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.dreValores=o;if(M.atual==='dre'&&!(document.activeElement?.dataset?.dre))rerender()},()=>{});
 })();
 })();
