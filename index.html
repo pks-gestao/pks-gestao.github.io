@@ -762,6 +762,7 @@ tr.vx-painel td{background:var(--sunken)}
   <section id="v-mc" class="section" hidden></section>
   <section id="v-dre" class="section" hidden></section>
   <section id="v-estoque" class="section" hidden></section>
+  <section id="v-estmov" class="section" hidden></section>
   <section id="v-pcpvaeso" class="section" hidden></section>
   <section id="v-config" class="section" hidden></section>
   <section id="v-bloqueio" class="section" hidden></section>
@@ -873,7 +874,7 @@ const IC={home:'<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/>',
 const MODS=[['home','Home',[['home','Home']]],['cadastros','Cadastros',[['-','Classificação'],['forn','Fornecedores'],['cfop','CFOP'],['-','Clientes e produtos'],['clientes','Clientes'],['produtos','Produtos']]],
   ['entradas','Entradas',[['-','Lançador de NF'],['notas','Notas para lançar'],['entrada','Entrada de Notas'],['lancadas','Lançadas'],['padrao','Padrão de lançamento'],['-','Análise'],['nfe','NF-e'],['custonf','Custo NF entrada']]],
   ['estruturas','Estruturas',[['estrutura','Estrutura do produto'],['formacao','Formação de preço'],['roteiro','Roteiro']]],
-  ['estoque','Estoque',[['estoque','Estoque']]],
+  ['estoque','Estoque',[['estoque','Estoque'],['estmov','Movimentações']]],
   ['pcp','PCP',[['pcpvaeso','Ordens de produção Vaeso']]],
   ['faturamento','Faturamento',[['faturamento','Faturamento'],['fpvenda','Formação de preço']]],
   ['contabilidade','Contabilidade',[['mc','MC'],['dre','DRE']]],
@@ -932,7 +933,7 @@ $('buscaSis').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefaul
    Isso só esconde telas: quem tem o link do artifact consegue ler os dados publicados. */
 const SETORES=['Financeiro','PCP/Compras','Diretoria','Logística'];
 S.acesso={pronto:false,adm:false,reg:null};S.usuarios=[];S.cfgHits=[];
-function podeVer(t){const A=S.acesso;if(!A.pronto)return false;if(A.adm)return true;if(t==='config')return false;return !!(A.reg&&(A.reg.abas||[]).includes(t))}
+function podeVer(t){const A=S.acesso;if(!A.pronto)return false;if(A.adm)return true;if(t==='config')return false;/* Movimentações segue a permissão de Estoque */return !!(A.reg&&(A.reg.abas||[]).includes(t==='estmov'?'estoque':t))}
 function mostraBloqueio(){for(const k of ABAS)$('v-'+k).hidden=true;const b=$('v-bloqueio');b.hidden=false;
   b.innerHTML=S.acesso.pronto?'<div class="empty"><b>Seu acesso ainda não foi liberado.</b><br>Peça ao administrador do Sistema PKS para liberar as telas do seu setor.</div>':'<div class="empty">Verificando o seu acesso…</div>';
   $('olhoMod').textContent='Sistema PKS';$('tituloMod').textContent='Acesso';$('subMod').hidden=true;$('trilha').innerHTML='Sistema PKS';desenhaMenu('home')}
@@ -950,7 +951,7 @@ function perfilUI(){if(!S.perfil)return;$('perfilNome').textContent=S.perfil;$('
 /* Configurações › Usuários */
 async function renderConfig(){const box=$('v-config');if(!S.acesso.adm){box.innerHTML='';return}
   const U=S.usuarios;let ps={};try{if(U.length&&S.userCap)ps=await S.userCap.profiles(U.map(x=>x.id))}catch{}
-  const GR=MODS.filter(m=>m[0]!=='config').map(([k,l,a])=>[l,a.filter(x=>x[0]!=='-')]);
+  const GR=MODS.filter(m=>m[0]!=='config').map(([k,l,a])=>[l,a.filter(x=>x[0]!=='-'&&x[0]!=='estmov')]);
   let h=`<div class="cfg-add"><label class="campo cresce"><span>Adicionar pessoa</span><input type="search" id="cfgBusca" placeholder="Nome ou e-mail de quem já tem acesso ao link" autocomplete="off"></label><div id="cfgRes" class="cfg-res"></div>
     <p class="small muted">A pessoa precisa primeiro receber o link pelo botão Compartilhar do Claude. Depois ela aparece nesta busca.</p></div>`;
   if(!U.length)h+='<div class="empty">Nenhuma pessoa cadastrada ainda.</div>';

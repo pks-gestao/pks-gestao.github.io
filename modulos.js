@@ -752,36 +752,71 @@ function exportaCnf(){const R=M._cnfExport&&M._cnfExport();if(!R)return;
    saída = NF de receita emitida para a Vaeso e não cancelada. Estoque inicial zerado em 25/11/2026 (Chai): só conta o que veio depois (ESTOQUE_ZERO).
    Saldo negativo = saiu na nota mais do que foi apontado. Os outros clientes ainda não têm entrada: saldo null. */
 const ESTOQUE_ZERO={em:'2026-11-25T18:29:55Z',dia:'2026-11-25',nota:28230};
-function estoquePks(linhas,ops,zero,ehReceita,ehDaVaeso,dia){
+/* Entradas de um item de ordem. Cada apontamento grava em estoque_mov a diferença (delta) do total; o que mudou sem registro
+   (apontamento que a Vaeso recebeu depois, registro que falhou) entra como a diferença que falta, no dia da última confirmação. */
+function entradasDoItem(total,em,logs,depoisDoZero,dia){
+  const out=[],diaDe=v=>/^\d{4}-\d{2}-\d{2}$/.test(v)?v:dia(v),poe=(q,v)=>{if(q&&v&&depoisDoZero(v))out.push({data:diaDe(v),em:v,q})};
+  if(!logs.length){poe(total,em);return out}
+  const L=[...logs].sort((a,b)=>String(a.em).localeCompare(String(b.em)));let soma=+L[0].antes||0;poe(soma,L[0].antesEm);
+  for(const l of L){const ant=+l.antes||0;if(ant!==soma){poe(ant-soma,l.em);soma=ant}poe(+l.delta||0,l.em);soma+=+l.delta||0}
+  if(total!==soma)poe(total-soma,em||L[L.length-1].em);
+  return out;
+}
+function estoquePks(linhas,ops,logs,zero,ehReceita,ehDaVaeso,dia){
   const g=new Map(),cod=v=>String(v||'').trim().toUpperCase(),vaeso=linhas.find(l=>ehDaVaeso(l.destNome))?.destNome||'VAESO';
+  const depois=v=>/^\d{4}-\d{2}-\d{2}$/.test(v)?v>zero.dia:Date.parse(v)>Date.parse(zero.em),porItem={};
+  for(const l of Object.values(logs||{})){const k=l.op_id+'|'+l.produto_id;(porItem[k]=porItem[k]||[]).push(l)}
   const linha=(c,cli,desc,un)=>{const k=c+'|'+cli;let o=g.get(k);if(!o){o={k,cod:c,desc,un,cli,vae:ehDaVaeso(cli),ent:0,sai:0,saldo:null,mov:[],ult:''};g.set(k,o)}return o};
   for(const l of linhas){if(!ehReceita(l.cfop))continue;const c=cod(l.cod);if(!c)continue;const o=linha(c,l.destNome,l.desc,l.un);
     if(l.data>=o.ult){o.ult=l.data;o.desc=l.desc||o.desc}
-    if(o.vae&&l.data>=zero.dia&&+l.nota>zero.nota){o.sai+=+l.q||0;o.mov.push({data:l.data,tipo:'saida',doc:'NF '+(+l.nota||l.nota),q:+l.q||0})}}
+    if(o.vae&&l.data>=zero.dia&&+l.nota>zero.nota){o.sai+=+l.q||0;o.mov.push({data:l.data,em:l.data+'T99',tipo:'saida',doc:'NF '+(+l.nota||l.nota),q:-(+l.q||0)})}}
   for(const p of Object.values(ops||{}))for(const it of p.itens||[]){const c=cod(it.sku);if(!c)continue;const o=linha(c,vaeso,it.descricao||'','UN');
-    const q=+it.produzido?.qtd||0,em=it.produzido?.em;if(!q||!em)continue;const so=/^\d{4}-\d{2}-\d{2}$/.test(em),d=so?em:dia(em);if(so?em<=zero.dia:!(Date.parse(em)>Date.parse(zero.em)))continue;
-    o.ent+=q;o.mov.push({data:d,tipo:'entrada',doc:(/^\d+$/.test(String(p.numero||''))?'OC '+p.numero:String(p.numero||'OC '+p.id))+(it.op_pks?' · OP '+it.op_pks:''),q})}
-  for(const o of g.values()){if(!o.vae)continue;o.saldo=Math.round((o.ent-o.sai)*1000)/1000;o.mov.sort((a,b)=>b.data.localeCompare(a.data)||a.tipo.localeCompare(b.tipo))}
+    const doc=(/^\d+$/.test(String(p.numero||''))?'OC '+p.numero:String(p.numero||'OC '+p.id))+(it.op_pks?' · OP '+it.op_pks:'');
+    for(const e of entradasDoItem(+it.produzido?.qtd||0,it.produzido?.em||'',porItem[p.id+'|'+it.produto_id]||[],depois,dia)){o.ent+=e.q;o.mov.push({data:e.data,em:e.em,tipo:e.q<0?'estorno':'entrada',doc,q:e.q})}}
+  for(const o of g.values()){if(!o.vae)continue;o.mov.sort((a,b)=>a.data.localeCompare(b.data)||String(a.em).localeCompare(String(b.em)));
+    let sd=0;for(const m of o.mov){sd=Math.round((sd+m.q)*1000)/1000;m.saldo=sd;m.cod=o.cod;m.desc=o.desc;m.cli=o.cli;m.un=o.un}o.saldo=sd;o.mov.reverse()}
   return [...g.values()];
 }
+const MOV_TIPO={entrada:['Entrada · apontamento','p-done'],estorno:['Estorno de apontamento','p-ready'],saida:['Saída · nota fiscal','p-info']};
+const movTipo=m=>`<span class="pill ${MOV_TIPO[m.tipo][1]}">${MOV_TIPO[m.tipo][0]}</span>`,movQ=m=>`<b class="${m.q<0?'txt-stop':''}">${m.q>0?'+':m.q<0?'−':''}${num(Math.abs(m.q),2)}</b>`;
+/* Carrega o que as duas telas do Estoque usam; devolve null enquanto espera */
+function estoqueDados(box,fn){
+  const L=fatLinhas();
+  if(!L){box.innerHTML=esperando('Carregando o estoque…');carregar('faturamento').then(()=>{if(['estoque','estmov'].includes(M.atual))rerender()}).catch(()=>box.innerHTML=esperando('Não foi possível carregar os produtos.'));return null}
+  if((!M.vxPronto||!M.movPronto)&&S.db){box.innerHTML=esperando('Carregando as movimentações…');return null}
+  return estoquePks(L,M.vxOps,M.estMov,ESTOQUE_ZERO,c=>tipoCfop(c).t==='Receita',ehVaeso,diaSP);
+}
+const estCliUI=(k,clientes)=>selUI(k,[['todos','Todos os clientes'],...PRINCIPAIS.map(([c,l])=>[clientes.find(x=>x.includes(c))||c,'★ '+l]),...clientes.map(c=>[c,c])],'Cliente');
 function renderEstoque(){
-  const box=$('v-estoque'),L=fatLinhas();
-  if(!L){box.innerHTML=esperando('Carregando o estoque…');carregar('faturamento').then(renderEstoque).catch(()=>box.innerHTML=esperando('Não foi possível carregar os produtos.'));return}
-  if(!M.vxPronto&&S.db){box.innerHTML=esperando('Carregando os apontamentos…');return}
-  const T=estoquePks(L,M.vxOps,ESTOQUE_ZERO,c=>tipoCfop(c).t==='Receita',ehVaeso,diaSP);
+  const box=$('v-estoque'),T=estoqueDados(box);if(!T)return;
   const clientes=[...new Set(T.map(r=>r.cli))].sort(COLL.compare),cli=ui('est_pcli','todos'),q=ui('b_estq',''),aberto=ui('estq_open',()=>new Set());
-  const R=T.filter(r=>(cli==='todos'||r.cli===cli)&&casa(`${r.cod} ${r.desc} ${r.cli}`,q)),soma=(rs,k)=>rs.reduce((a,r)=>a+(r[k]||0),0);
-  const ultNf=L.reduce((m,l)=>l.data>m?l.data:m,''),semV='<span class="muted">–</span>';
-  const cols=[{k:'cod',l:'Código',cls:()=>'mono',f:r=>`${r.mov.length?`<span class="seta">${aberto.has(r.k)?'▾':'›'}</span> `:'<span class="seta"></span> '}${esc(r.cod)}`},{k:'desc',l:'Descrição',cls:()=>'trunca',f:r=>`<span title="${esc(r.desc)}">${esc(r.desc)}</span>`},
+  const R=T.filter(r=>(cli==='todos'||r.cli===cli)&&casa(`${r.cod} ${r.desc} ${r.cli}`,q)),soma=(rs,k)=>rs.reduce((a,r)=>a+(r[k]||0),0),semV='<span class="muted">–</span>';
+  const cols=[{k:'cod',l:'Código',cls:()=>'mono',f:r=>`<span class="seta">${aberto.has(r.k)?'▾':'›'}</span> ${esc(r.cod)}`},{k:'desc',l:'Descrição',cls:()=>'trunca',f:r=>`<span title="${esc(r.desc)}">${esc(r.desc)}</span>`},
     {k:'cli',l:'Cliente',cls:()=>'trunca',f:r=>`<span title="${esc(r.cli)}">${esc(r.cli)}</span>`},{k:'un',l:'UM'},
     {k:'ent',l:'Entradas',num:1,v:r=>r.vae?r.ent:null,f:r=>r.vae?num(r.ent,2):semV},{k:'sai',l:'Saídas',num:1,v:r=>r.vae?r.sai:null,f:r=>r.vae?num(r.sai,2):semV},
     {k:'saldo',l:'Saldo estoque',num:1,f:r=>r.saldo===null?semV:`<b class="${r.saldo<0?'txt-stop':''}">${num(r.saldo,2)}</b>`}];
-  const det=r=>`<tr><td colspan="7" class="detail"><div class="inner"><table><thead><tr><th>Data</th><th>Movimento</th><th>Documento</th><th class="num">Quantidade</th></tr></thead><tbody>${r.mov.map(m=>`<tr><td>${dt(m.data)}</td><td>${m.tipo==='entrada'?'Entrada · apontamento':'Saída · nota fiscal'}</td><td>${esc(m.doc)}</td><td class="num">${m.tipo==='entrada'?'':'−'}${num(m.q,2)}</td></tr>`).join('')}</tbody></table></div></td></tr>`;
-  box.innerHTML=`<p class="vx-busca">Vaeso zerado em ${dt(ESTOQUE_ZERO.dia)}: entradas pelo apontamento, saídas pelas notas emitidas até ${dt(ultNf)}.</p>
-  <div class="tools filtros">${selUI('est_pcli',[['todos','Todos os clientes'],...PRINCIPAIS.map(([k,l])=>[clientes.find(c=>c.includes(k))||k,'★ '+l]),...clientes.map(c=>[c,c])],'Cliente')}${buscaUI('estq','Código, descrição ou cliente')}</div>`+
+  const det=r=>`<tr><td colspan="7" class="detail">${r.mov.length?`<div class="inner"><table><thead><tr><th>Data</th><th>Movimento</th><th>Documento</th><th class="num">Quantidade</th><th class="num">Saldo</th></tr></thead><tbody>${r.mov.map(m=>`<tr><td>${dt(m.data)}</td><td>${movTipo(m)}</td><td>${esc(m.doc)}</td><td class="num">${movQ(m)}</td><td class="num">${num(m.saldo,2)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="small muted">Nenhuma movimentação neste produto.</p>'}</td></tr>`;
+  box.innerHTML=`<div class="tools filtros">${estCliUI('est_pcli',clientes)}${buscaUI('estq','Código, descrição ou cliente')}</div>`+
   tabela('estq',cols,R,{ordem:'saldo',desc:true,porPagina:50,cls:'compacto fit',vazio:'Nenhum produto com esse filtro.',
-    linha:r=>r.mov.length?` data-estq="${esc(r.k)}" class="row" tabindex="0" aria-expanded="${aberto.has(r.k)}"`:'',depois:r=>r.mov.length&&aberto.has(r.k)?det(r):'',
+    linha:r=>` data-estq="${esc(r.k)}" class="row" tabindex="0" aria-expanded="${aberto.has(r.k)}"`,depois:r=>aberto.has(r.k)?det(r):'',
     total:rs=>`<td colspan="4"><b>${rs.length.toLocaleString('pt-BR')} produto${rs.length===1?'':'s'}</b></td><td class="num"><b>${num(soma(rs,'ent'),2)}</b></td><td class="num"><b>${num(soma(rs,'sai'),2)}</b></td><td class="num"><b>${num(soma(rs,'saldo'),2)}</b></td>`});
+}
+/* Estoque › Movimentações: todas as entradas e saídas */
+function renderEstMov(){
+  const box=$('v-estmov'),T=estoqueDados(box);if(!T)return;
+  const V=T.flatMap(r=>r.mov),clientes=[...new Set(T.filter(r=>r.vae).map(r=>r.cli))].sort(COLL.compare),cli=ui('estm_cli','todos'),tp=ui('estm_tipo','todos'),q=ui('b_estm','');
+  const R=V.filter(m=>noPeriodo('estm',m.data)&&(cli==='todos'||m.cli===cli)&&(tp==='todos'||m.tipo===tp)&&casa(`${m.cod} ${m.desc} ${m.doc} ${m.cli}`,q));
+  const cols=[{k:'data',l:'Data',v:m=>m.data+' '+m.em,f:m=>dt(m.data)},{k:'tipo',l:'Movimento',f:movTipo},{k:'cod',l:'Código',cls:()=>'mono'},{k:'desc',l:'Descrição',cls:()=>'trunca',f:m=>`<span title="${esc(m.desc)}">${esc(m.desc)}</span>`},
+    {k:'cli',l:'Cliente',cls:()=>'trunca',f:m=>`<span title="${esc(m.cli)}">${esc(m.cli)}</span>`},{k:'doc',l:'Documento'},{k:'q',l:'Quantidade',num:1,f:movQ},{k:'un',l:'UM'}];
+  const tot=rs=>rs.reduce((a,m)=>a+m.q,0);
+  box.innerHTML=`<div class="tools filtros">${periodoUI('estm')}${estCliUI('estm_cli',clientes)}${selUI('estm_tipo',[['todos','Todas'],['entrada','Entradas'],['saida','Saídas'],['estorno','Estornos']],'Movimento')}${buscaUI('estm','Código, descrição, OC ou NF')}</div>`+
+  tabela('estm',cols,R,{ordem:'data',desc:true,porPagina:50,cls:'compacto fit',vazio:'Nenhuma movimentação com esse filtro.',
+    total:rs=>`<td colspan="6"><b>${rs.length.toLocaleString('pt-BR')} ${rs.length===1?'movimentação':'movimentações'}</b></td><td class="num"><b>${tot(rs)<0?'−':''}${num(Math.abs(tot(rs)),2)}</b></td><td></td>`});
+}
+/* Registra no item a diferença que o apontamento trouxe (estoque_mov). Se falhar, entradasDoItem completa pela diferença. */
+function registraMov(db,r,antes,antesEm,depois){
+  const delta=depois-antes;if(!db||!delta)return;
+  return db.doc(`estoque_mov/${r.op_id}|${r.produto_id}|${Date.now()}`).set({op_id:r.op_id,produto_id:r.produto_id,sku:r.sku,antes,antesEm,depois,delta,em:new Date().toISOString()}).catch(()=>{});
 }
 
 /* ---------- PCP: ordens de produção Vaeso (integração com o Gestão Vaeso) ---------- */
@@ -870,8 +905,9 @@ async function vxEnviar(k,acao,conf){
   const corpo={acao,op_id:r.op_id,produto_id:r.produto_id};
   if(acao==='confirmar'){corpo.conferencia=conf;if(conf!=='igual'){const v=Math.round(+String(document.getElementById('vxQtd')?.value||'').replace(',','.'));
     if(!(v>0)){M.vxErro='Informe a quantidade produzida.';rerender();return}if(conf==='menos'&&v>=r.qtd||conf==='mais'&&v<=r.qtd){M.vxErro=`A quantidade precisa ser ${conf==='menos'?'menor':'maior'} que ${n0(r.qtd)}.`;rerender();return}corpo.qtd=v}}
+  const antes=r.prod?+r.prod.qtd||0:0,antesEm=r.prod?.em||'',depois=acao==='desfazer'?0:conf==='igual'?Math.round(r.qtd):corpo.qtd;
   M.vxOcupado=true;M.vxErro='';rerender();
-  try{const res=await window.pksFuncao('pks-vaeso',corpo);ui('vx_open',()=>new Set()).clear();M.ui.vx_modo='';M.vxVal='';
+  try{const res=await window.pksFuncao('pks-vaeso',corpo);if(res?.enviado)await registraMov(S.db,r,antes,antesEm,depois);ui('vx_open',()=>new Set()).clear();M.ui.vx_modo='';M.vxVal='';
     toast(res?.enviado?(acao==='desfazer'?'Confirmação desfeita na Vaeso.':'Produção enviada à Vaeso.'):'Gravado. Será enviado à Vaeso na próxima tentativa.')}
   catch(e){M.vxErro=e.message||'Não foi possível concluir.'}
   M.vxOcupado=false;rerender();
@@ -1060,7 +1096,7 @@ function exportaMC(){const x=M._mcExport&&M._mcExport();if(!x)return;
   baixaCsv('margem-contribuicao-'+ui('fech_per','ano')+(ui('mc_cli','todos')!=='todos'?'-'+ui('mc_cli','todos').split(' ')[0].toLowerCase():'')+'.csv',String.fromCharCode(65279)+lin.join(String.fromCharCode(13,10)))}
 
 /* ---------- eventos ---------- */
-const RENDER={home:renderHome,estoque:renderEstoque,fpvenda:renderFpVenda,pcpvaeso:renderPcpVaeso,custonf:renderCustoNf,formacao:renderFormacao,forn:renderForn,cfop:renderCfop,faturamento:renderFaturamento,clientes:renderClientes,produtos:renderProdutos,nfe:renderNfe,estrutura:renderEstrutura,roteiro:renderRoteiro,mc:renderMC,dre:renderDRE};
+const RENDER={home:renderHome,estoque:renderEstoque,estmov:renderEstMov,fpvenda:renderFpVenda,pcpvaeso:renderPcpVaeso,custonf:renderCustoNf,formacao:renderFormacao,forn:renderForn,cfop:renderCfop,faturamento:renderFaturamento,clientes:renderClientes,produtos:renderProdutos,nfe:renderNfe,estrutura:renderEstrutura,roteiro:renderRoteiro,mc:renderMC,dre:renderDRE};
 M.atual=null;
 M.vxPainelAtivo=()=>document.activeElement?.id==='vxQtd';
 /* Só um item aberto por vez. */
@@ -1158,8 +1194,9 @@ document.addEventListener('input',e=>{const t=e.target;if(t.dataset?.mb){M.ui['b
   S.db.collection('formacao').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.form=o;if((M.atual==='formacao'||M.atual==='fpvenda')&&!document.activeElement?.dataset?.fpf&&!document.activeElement?.dataset?.fpmp&&!document.activeElement?.dataset?.fpvpreco&&!document.activeElement?.dataset?.fpvemb&&!document.activeElement?.dataset?.fpvinj)rerender()},()=>{});
   S.db.collection('classif').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.classif=o;if(!document.activeElement?.dataset?.cls)rerender()},()=>{});
   S.db.doc('config/categorias').onSnapshot(s=>{M.cats=s.exists?(s.data().lista||[]):[];if(['forn','nfe'].includes(M.atual))rerender()},()=>{});
-  S.db.collection('vaeso_ops').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxOps=o;M.vxPronto=true;if(M.atual==='estoque'||M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{M.vxPronto=true;if(['pcpvaeso','estoque'].includes(M.atual))rerender()});
+  S.db.collection('vaeso_ops').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxOps=o;M.vxPronto=true;if(['estoque','estmov'].includes(M.atual)||M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{M.vxPronto=true;if(['pcpvaeso','estoque','estmov'].includes(M.atual))rerender()});
   S.db.collection('vaeso_prod').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxProd=o;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
+  S.db.collection('estoque_mov').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.estMov=o;M.movPronto=true;if(['estoque','estmov'].includes(M.atual))rerender()},()=>{M.movPronto=true;if(['estoque','estmov'].includes(M.atual))rerender()});
   S.db.collection('pcp_linhas').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxLin=o;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
   S.db.doc('meta/vaeso_sync').onSnapshot(s=>{M.vxMeta=s.exists?s.data():null;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
   S.db.doc('config/contabilidade').onSnapshot(s=>{M.config=s.exists?s.data():{};if(['mc','dre','fpvenda'].includes(M.atual)&&!(document.activeElement?.dataset?.cfg))rerender()},()=>{});

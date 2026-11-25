@@ -270,13 +270,16 @@ async function relerPcp(){for(const [c,k] of [['vaeso_ops','ops'],['vaeso_prod',
 function avisa(m,erro){ST.pcp.msg=m;ST.pcp.msgErro=!!erro}
 /* Encerra a ordem na Vaeso quando todas as linhas acabaram e alguma ficou a menos */
 async function encerraOrdem(id){const o=ordemDe(id);if(!o?.encerrar)return false;await window.pksFuncao('pks-vaeso',{acao:'encerrar',op_id:o.op_id});return true}
+/* Registra no item a diferença que o apontamento trouxe (estoque_mov, usado no Estoque do site) */
+function registraMov(r,depois){const antes=r.prod||0,delta=depois-antes;if(!delta)return;
+  return ST.db.doc(`estoque_mov/${r.k}|${Date.now()}`).set({op_id:r.op_id,produto_id:r.produto_id,sku:r.sku,antes,antesEm:r.em||'',depois,delta,em:new Date().toISOString()}).catch(()=>{})}
 /* Aponta o total produzido. encerra: true (encerrar a linha a menos), false (continuar aberta) */
 async function aponta(r,qtd,conferencia,encerra){
   const p=ST.pcp;if(p.ocup)return;p.ocup=true;p.msg='';if(p.ap)p.ap.erro='';desenha();
   let enviado=false,feito=false;
   try{
     const corpo={acao:'confirmar',op_id:r.op_id,produto_id:r.produto_id,conferencia};if(conferencia!=='igual')corpo.qtd=qtd;
-    enviado=!!(await window.pksFuncao('pks-vaeso',corpo))?.enviado;feito=true;
+    enviado=!!(await window.pksFuncao('pks-vaeso',corpo))?.enviado;feito=true;if(enviado)await registraMov(r,qtd);
     if(conferencia==='menos'&&encerra)await ST.db.doc('pcp_linhas/'+r.k).set({encerrada:true,qtd,op_id:r.op_id,produto_id:r.produto_id,em:new Date().toISOString()});
     else if(ST.marcas[r.k])await ST.db.doc('pcp_linhas/'+r.k).delete();
     await relerPcp();
@@ -316,7 +319,7 @@ document.addEventListener('click',async e=>{const t=e.target;
   const mo=t.closest('[data-modo]');if(mo&&P.ap){if(mo.dataset.modo==='igual')confirmaAp('igual');else{P.ap.modo=mo.dataset.modo;P.ap.erro='';P.foco=true;desenha()}return}
   if(t.closest('[data-apok]')&&P.ap){confirmaAp(P.ap.modo);return}
   const fi=t.closest('[data-fim]');if(fi&&P.ap){if(fi.dataset.fim==='cancela'){P.ap.perg=false;desenha();return}const r=linhas().find(x=>x.k===P.ap.k);if(r)aponta(r,P.ap.qtd,'menos',fi.dataset.fim==='encerra');return}
-  if(t.closest('[data-desf]')&&P.ap){const r=linhas().find(x=>x.k===P.ap.k);if(r&&confirm('Desfazer o apontamento deste produto, aqui e na Vaeso?'))fazPcp(async()=>{const x=await window.pksFuncao('pks-vaeso',{acao:'desfazer',op_id:r.op_id,produto_id:r.produto_id});if(ST.marcas[r.k])await ST.db.doc('pcp_linhas/'+r.k).delete();return x?.enviado?'Apontamento desfeito.':'Gravado. Será desfeito na Vaeso na próxima tentativa.'});return}
+  if(t.closest('[data-desf]')&&P.ap){const r=linhas().find(x=>x.k===P.ap.k);if(r&&confirm('Desfazer o apontamento deste produto, aqui e na Vaeso?'))fazPcp(async()=>{const x=await window.pksFuncao('pks-vaeso',{acao:'desfazer',op_id:r.op_id,produto_id:r.produto_id});if(x?.enviado)await registraMov(r,0);if(ST.marcas[r.k])await ST.db.doc('pcp_linhas/'+r.k).delete();return x?.enviado?'Apontamento desfeito.':'Gravado. Será desfeito na Vaeso na próxima tentativa.'});return}
   const rb=t.closest('[data-reabre]');if(rb){fazPcp(()=>ST.db.doc('pcp_linhas/'+rb.dataset.reabre).delete().then(()=>''),'Linha reaberta.');return}
   const eo=t.closest('[data-encoc]');if(eo){const o=ordemDe(eo.dataset.encoc);if(o&&confirm(`Encerrar a ${o.numero} aqui e na Vaeso? Foram produzidas ${n0(o.feito)} de ${n0(o.ped)} peças.`))fazPcp(()=>encerraOrdem(o.id).then(()=>''),`${o.numero} encerrada na Vaeso.`);return}
 });
