@@ -39,6 +39,18 @@ function montar(ops,prods,marcas){
 const limpo=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const casa=(o,q,L=o.itens)=>{const p=limpo(q).split(/\s+/).filter(Boolean);if(!p.length)return true;const tem=t=>p.every(w=>t.includes(w));const n=limpo(o.numero);
   return tem(n)||L.some(r=>tem(n+' '+limpo(r.sku+' '+r.desc+' '+r.op)))};
-const R={casa,vxNumero,conferir,situacaoLinha,montar};
+/* Produzidos nos últimos 7 dias (pedido do Chai, 25/11/2026, como na Visão PKS do Gestão): por produto e por dia de São Paulo.
+   A PKS guarda só a última confirmação de cada item: o total apontado conta no dia dessa confirmação. */
+const diaSP=d=>new Date(d).toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});
+function produzidosNosDias(ops,hoje){
+  const dias=Array.from({length:7},(_,i)=>{const d=new Date(hoje+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-6+i);return d.toISOString().slice(0,10)});
+  const porDia=Object.fromEntries(dias.map(d=>[d,0])),g=new Map();let total=0;
+  for(const o of Object.values(ops||{}))for(const it of o.itens||[]){const p=it.produzido,q=+p?.qtd||0;if(!q||!p.em||isNaN(new Date(p.em)))continue;
+    const d=/^\d{4}-\d{2}-\d{2}$/.test(p.em)?p.em:diaSP(p.em);if(!(d in porDia))continue;
+    const k=it.sku||it.descricao||String(it.produto_id),l=g.get(k)||{sku:it.sku||'',desc:it.descricao||'',dias:{},total:0};
+    l.dias[d]=(l.dias[d]||0)+q;l.total+=q;porDia[d]+=q;total+=q;g.set(k,l)}
+  return {dias,porDia,total,linhas:[...g.values()].sort((a,b)=>b.total-a.total||a.sku.localeCompare(b.sku))};
+}
+const R={diaSP,produzidosNosDias,casa,vxNumero,conferir,situacaoLinha,montar};
 if(typeof module!=='undefined'&&module.exports)module.exports=R;else raiz.PCP=R;
 })(typeof window!=='undefined'?window:globalThis);

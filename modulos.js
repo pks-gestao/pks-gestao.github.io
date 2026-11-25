@@ -761,16 +761,35 @@ function vxOrdens(){
     .sort((a,b)=>a.emitida.localeCompare(b.emitida)||String(a.numero).localeCompare(String(b.numero),'pt-BR',{numeric:true}));
 }
 const vxLinhas=()=>vxOrdens().flatMap(o=>o.itens);
+/* Produzidos nos últimos 7 dias (pedido do Chai, 25/11/2026, como na Visão PKS do Gestão): por produto e por dia de São Paulo.
+   A PKS guarda só a última confirmação de cada item: o total apontado conta no dia dessa confirmação. */
+const diaSP=d=>new Date(d).toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});
+function produzidosNosDias(ops,hoje){
+  const dias=Array.from({length:7},(_,i)=>{const d=new Date(hoje+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-6+i);return d.toISOString().slice(0,10)});
+  const porDia=Object.fromEntries(dias.map(d=>[d,0])),g=new Map();let total=0;
+  for(const o of Object.values(ops||{}))for(const it of o.itens||[]){const p=it.produzido,q=+p?.qtd||0;if(!q||!p.em||isNaN(new Date(p.em)))continue;
+    const d=/^\d{4}-\d{2}-\d{2}$/.test(p.em)?p.em:diaSP(p.em);if(!(d in porDia))continue;
+    const k=it.sku||it.descricao||String(it.produto_id),l=g.get(k)||{sku:it.sku||'',desc:it.descricao||'',dias:{},total:0};
+    l.dias[d]=(l.dias[d]||0)+q;l.total+=q;porDia[d]+=q;total+=q;g.set(k,l)}
+  return {dias,porDia,total,linhas:[...g.values()].sort((a,b)=>b.total-a.total||a.sku.localeCompare(b.sku))};
+}
+const diaCurto=d=>['dom','seg','ter','qua','qui','sex','sáb'][new Date(d+'T12:00:00Z').getUTCDay()]+' '+ddmm(d);
+function quadroProduzidos(){
+  const hoje=diaSP(Date.now()),r=produzidosNosDias(M.vxOps,hoje),ab=ui('vx_prodz','aberto')==='aberto',rot=d=>d===hoje?'hoje':diaCurto(d);
+  return `<section class="nfa-painel vx-prodz" aria-label="Produzidos nos últimos 7 dias"><div class="vx-pz-t"><h3>Produzidos <small class="muted">últimos 7 dias</small></h3><b>${n0(r.total)} pç</b>${r.linhas.length?`<button type="button" class="bt vx-bt" data-uiset="vx_prodz" data-v="${ab?'fechado':'aberto'}" aria-expanded="${ab}">${ab?'Ocultar produtos':'Ver por produto'}</button>`:''}</div>
+  <div class="vx-pz-d">${r.dias.map(d=>`<div class="${d===hoje?'hoje':''}"><span>${rot(d)}</span><b>${n0(r.porDia[d])}</b></div>`).join('')}</div>
+  ${!r.linhas.length?'<p class="small muted">Nenhuma produção apontada nos últimos 7 dias.</p>':ab?`<div class="scroll"><table class="compacto fit"><thead><tr><th>Produto</th>${r.dias.map(d=>`<th class="num">${diaCurto(d)}</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>${r.linhas.map(l=>`<tr><td><span class="mono muted">${esc(l.sku)}</span> ${esc(l.desc)}</td>${r.dias.map(d=>`<td class="num">${l.dias[d]?n0(l.dias[d]):'<span class="muted">–</span>'}</td>`).join('')}<td class="num"><b>${n0(l.total)}</b></td></tr>`).join('')}<tr class="tot"><td><b>Total · ${r.linhas.length} produto${r.linhas.length===1?'':'s'}</b></td>${r.dias.map(d=>`<td class="num"><b>${n0(r.porDia[d])}</b></td>`).join('')}<td class="num"><b>${n0(r.total)}</b></td></tr></tbody></table></div>`:''}</section>`;
+}
 function renderPcpVaeso(){
   const box=$('v-pcpvaeso');
   if(!M.vxPronto){box.innerHTML=esperando('Carregando as ordens de produção da Vaeso…');return}
-  const O=vxOrdens(),q=ui('b_vx',''),aba=ui('vx_aba','abertas'),aberto=ui('vx_open',()=>new Set()),site=!!window.pksFuncao;
+  const O=vxOrdens(),q=ui('b_vx',''),aba=ui('vx_aba','abertas'),aberto=ui('vx_open',()=>new Set()),ordAb=ui('vx_ord',()=>new Set()),site=!!window.pksFuncao;
   const abertas=O.filter(o=>o.status==='aberta'),fin=O.filter(o=>o.status!=='aberta');
   const casaO=o=>casa(`${o.numero} ${o.obs} ${o.itens.map(r=>r.sku+' '+r.desc+' '+r.opPks).join(' ')}`,q);
   const lista=(aba==='abertas'?abertas:fin).filter(casaO),meta=M.vxMeta||{},itAb=abertas.flatMap(o=>o.itens);
   const kpi=(t,v,s)=>`<div class="card-k"><span>${t}</span><b>${v}</b>${s?`<small class="muted">${s}</small>`:''}</div>`;
-  const quando=meta.em?new Date(meta.em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'–';
-  let h=`<div class="cards3">${kpi('Ordens em aberto',n0(abertas.length),n0(itAb.length)+' itens')}${kpi('Itens sem confirmação',n0(itAb.filter(r=>!r.prod).length),'produção ainda não informada')}${kpi('Peças pedidas em aberto',n0(itAb.reduce((a,r)=>a+r.qtd,0)),'')}${kpi('Última busca na Vaeso',quando,meta.erro?`<span class="txt-stop">Erro: ${esc(meta.erro)}</span>`:'a cada 10 minutos')}</div>
+  const quando=meta.ultimoPuxar||meta.em?new Date(meta.ultimoPuxar||meta.em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'–';
+  let h=`<p class="vx-busca">Última busca na Vaeso: ${quando} · a cada 10 minutos${meta.erro?` · <span class="txt-stop">Erro: ${esc(meta.erro)}</span>`:''}</p>${quadroProduzidos()}<div class="cards3">${kpi('Ordens em aberto',n0(abertas.length),n0(itAb.length)+' itens')}${kpi('Itens sem confirmação',n0(itAb.filter(r=>!r.prod).length),'produção ainda não informada')}${kpi('Peças pedidas em aberto',n0(itAb.reduce((a,r)=>a+r.qtd,0)),'')}</div>
   <nav class="nfa-tabs vx-abas" aria-label="Situação das ordens">${[['abertas','Em aberto',abertas.length],['finalizadas','Finalizadas',fin.length]].map(([k,l,n])=>`<button data-uiset="vx_aba" data-v="${k}" aria-pressed="${aba===k}">${l} <span class="small">${n}</span></button>`).join('')}</nav>
   <div class="tools filtros">${buscaUI('vx','OC, OP da PKS, SKU ou descrição')}</div>`;
   if(!site)h+=`<p class="small muted">A confirmação do produzido é feita no site do PKS (pks-gestao.github.io). Aqui a lista é só para consulta.</p>`;
@@ -780,13 +799,13 @@ function renderPcpVaeso(){
   const finLin=r=>r.status==='aberta'&&r.prod&&(r.prod.conferencia==='igual'||r.prod.conferencia==='mais'||+r.prod.qtd>=Math.round(r.qtd)||((M.vxLin||{})[r.k]?.encerrada&&+M.vxLin[r.k].qtd===+r.prod.qtd))?' <span class="pill p-done" title="Linha finalizada">Finalizada</span>':'';
   const envio=r=>!r.env||r.env.acao==='desfazer'&&r.env.envio==='enviado'?'':r.env.envio==='enviado'?'<span class="small vx-ok" title="Recebido pela Vaeso">✓ enviado</span>':`<span class="small txt-stop" title="${esc(r.env.erro||'')}">a enviar</span>`;
   const stPill=o=>o.status==='aberta'?(o.feito>0?'<span class="pill p-ready">Parcial</span>':'<span class="pill p-open">Em aberto</span>'):o.status==='cancelada'?'<span class="pill p-stop">Cancelada</span>':'<span class="pill p-done">Concluída</span>';
-  for(const o of lista){
-    h+=`<section class="vx-ordem"><header class="vx-cab"><div class="vx-tit"><b>${esc(o.numero)}</b> ${stPill(o)}<span class="small muted">Emissão ${dt(o.emitida)}${o.prevista?' · prevista '+dt(o.prevista):''}${o.obs?' · '+esc(o.obs):''}</span></div>
+  for(const o of lista){const oa=ordAb.has(String(o.id));
+    h+=`<section class="vx-ordem${oa?' aberta':''}"><header class="vx-cab" data-vxord="${esc(o.id)}" role="button" tabindex="0" aria-expanded="${oa}"><span class="seta" aria-hidden="true">${oa?'▾':'›'}</span><div class="vx-tit"><b>${esc(o.numero)}</b> ${stPill(o)}<span class="small muted">Emissão ${dt(o.emitida)}${o.prevista?' · prevista '+dt(o.prevista):''}${o.obs?' · '+esc(o.obs):''}</span></div>
       <div class="vx-prog" title="${num(o.pct,0)}% confirmado como produzido"><span class="small"><b>${n0(o.feito)}</b> de ${n0(o.ped)} pç</span><span class="pcp-bar"><i style="width:${o.pct}%"></i></span></div>
       ${site&&o.status==='aberta'?`<button type="button" class="bt vx-bt" data-vxenc="${esc(o.id)}" ${M.vxOcupado?'disabled':''}>Encerrar</button>`:''}</header>
-      <div class="scroll"><table class="compacto fit vx-itens"><thead><tr><th>OP PKS</th><th>SKU</th><th>Descrição</th><th class="num">Pedido</th><th class="num">Entregue</th><th>Produzido PKS</th><th></th></tr></thead><tbody>${o.itens.map(r=>
+      ${!oa?'':`<div class="scroll"><table class="compacto fit vx-itens"><thead><tr><th>OP PKS</th><th>SKU</th><th>Descrição</th><th class="num">Pedido</th><th class="num">Entregue</th><th>Produzido PKS</th><th></th></tr></thead><tbody>${o.itens.map(r=>
       `<tr><td class="mono">${r.opPks?esc(r.opPks):'<span class="muted">–</span>'}</td><td class="mono">${esc(r.sku)}</td><td class="trunca"><span title="${esc(r.desc)}">${esc(r.desc)}</span></td><td class="num">${num(r.qtd,2)}</td><td class="num">${num(r.entregue,2)}</td><td>${chip(r)}${finLin(r)} ${envio(r)}</td>
-       <td>${site&&o.status==='aberta'?`<button type="button" class="bt vx-bt" data-vxopen="${esc(r.k)}" aria-expanded="${aberto.has(r.k)}">${r.prod?'Alterar':'Produzido'}</button>`:''}</td></tr>${aberto.has(r.k)&&site&&o.status==='aberta'?vxPainel(r):''}`).join('')}</tbody></table></div></section>`;
+       <td>${site&&o.status==='aberta'?`<button type="button" class="bt vx-bt" data-vxopen="${esc(r.k)}" aria-expanded="${aberto.has(r.k)}">${r.prod?'Alterar':'Produzido'}</button>`:''}</td></tr>${aberto.has(r.k)&&site&&o.status==='aberta'?vxPainel(r):''}`).join('')}</tbody></table></div>`}</section>`;
   }
   box.innerHTML=h;
   const inp=document.getElementById('vxQtd');if(inp&&M.vxFoco){inp.focus();M.vxFoco=false}
@@ -1043,6 +1062,7 @@ document.addEventListener('click',e=>{
   const fc=t.closest('[data-fatbar]');if(fc){const [de,ate,mes]=fc.dataset.fatbar.split('|');Object.assign(ui('per_fat',()=>({})),mes?{modo:'mes',de,ate}:{modo:'int',de,ate});M.ui.fat_vis='notas';perMudou();document.querySelector('#v-faturamento .seg[aria-label="Visão"]')?.scrollIntoView({block:'start',behavior:'smooth'});return}
   const no=t.closest('tr[data-nfopen]');if(no){const s=ui('nfa_open',()=>new Set());const k=no.dataset.nfopen;umaSo(s,k);rerender();return}
   const ve=t.closest('[data-vxenc]');if(ve){vxEncerrar(ve.dataset.vxenc);return}
+  const vr=t.closest('[data-vxord]');if(vr){umaSo(ui('vx_ord',()=>new Set()),vr.dataset.vxord);ui('vx_open',()=>new Set()).clear();M.ui.vx_modo='';M.vxErro='';M.vxVal='';rerender();document.querySelector(`[data-vxord="${CSS.escape(vr.dataset.vxord)}"]`)?.focus();return}
   const vo=t.closest('[data-vxopen]');if(vo){umaSo(ui('vx_open',()=>new Set()),vo.dataset.vxopen);M.ui.vx_modo='';M.vxErro='';M.vxVal='';rerender();return}
   const vm=t.closest('[data-vxmodo]');if(vm){M.ui.vx_modo=vm.dataset.vxmodo;M.vxErro='';M.vxFoco=true;rerender();return}
   const vk=t.closest('[data-vxok]');if(vk){vxEnviar(vk.dataset.vxok,'confirmar',vk.dataset.conf);return}
@@ -1054,7 +1074,7 @@ document.addEventListener('click',e=>{
   const fo=t.closest('[data-fpopen]');if(fo){const s=ui('fp_open',()=>new Set());const k=fo.dataset.fpopen;umaSo(s,k);rerender();return}
   const er=t.closest('tr[data-est]');if(er){const s=ui('est_open',()=>new Set());const k=er.dataset.est;umaSo(s,k);rerender();return}
 });
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&M.atual==='fpvenda'&&M.ui.fpv_q){fpvFecha();return}if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('tr[data-est],tr[data-nfopen],tr[data-fatnota],[data-fatbar],[data-fpopen],[data-cnfopen],td[data-fpvq]')){e.preventDefault();e.target.click()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&M.atual==='fpvenda'&&M.ui.fpv_q){fpvFecha();return}if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('tr[data-est],tr[data-nfopen],tr[data-fatnota],[data-fatbar],[data-vxord],[data-fpopen],[data-cnfopen],td[data-fpvq]')){e.preventDefault();e.target.click()}});
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t.dataset.fpvpreco){const raw=t.value.trim();const v=raw===''?'':+raw.replace(/\./g,'').replace(',','.');if(raw!==''&&!(isFinite(v)&&v>0)){toast('Preço inválido. Use números, por exemplo 12,50.');return}salvaFicha(t.dataset.fpvpreco,{precoSim:v},v===''?'Preço médio de volta.':'Preço para simular salvo.');return}

@@ -700,6 +700,12 @@ tr.vx-painel td{background:var(--sunken)}
 .vx-tit{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px;flex:1 1 320px;min-width:0}.vx-tit b{font:700 16px var(--body)}
 .vx-prog{display:grid;gap:3px;min-width:150px}
 .vx-itens td,.vx-itens th{padding:7px 12px}
+/* PCP: ordens fechadas, última busca discreta e Produzidos (25/11/2026) */
+.vx-cab{cursor:pointer;border-bottom:0}.vx-ordem.aberta .vx-cab{border-bottom:1px solid var(--line)}.vx-cab:hover{background:color-mix(in srgb,var(--sunken) 70%,transparent)}.vx-cab:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
+.vx-busca{font-size:12px;color:var(--muted);margin:0;max-width:none}
+.vx-prodz{margin:4px 0 12px}.vx-pz-t{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 14px;margin-bottom:10px}.vx-pz-t h3{margin:0}.vx-pz-t h3 small{font-weight:500;font-size:13px}.vx-pz-t>b{font:700 19px var(--body)}.vx-pz-t .bt{margin-left:auto}
+.vx-pz-d{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-bottom:10px}.vx-pz-d div{border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:grid;gap:2px}.vx-pz-d .hoje{border-color:var(--ink)}.vx-pz-d span{font-size:12px;color:var(--muted)}.vx-pz-d b{font:700 16px var(--body);font-variant-numeric:tabular-nums}
+@media (max-width:700px){.vx-pz-d{grid-template-columns:repeat(auto-fit,minmax(84px,1fr))}}
 /* Celular (até 900px): a lateral vira gaveta aberta pelo botão Menu do topo; o submenu abre por cima dela com "Voltar" */
 .menu-bt,.sub-volta,.menu-fundo{display:none}
 @media (max-width:900px){
@@ -891,7 +897,7 @@ function route(){let t=ABAS.includes(location.hash.slice(1))?location.hash.slice
   if(t==='home'){const hr=new Date().getHours();$('olhoMod').textContent='Painel de controle';$('tituloMod').innerHTML=(hr<12?'Bom dia':hr<18?'Boa tarde':'Boa noite')+(S.perfil?', <span class="nome-red">'+esc(S.perfil)+'</span>':'');$('subMod').textContent='Acompanhe os principais indicadores e acesse rapidamente as áreas do sistema.';$('subMod').hidden=false;$('trilha').innerHTML='Sistema PKS<span class="sep">/</span><b>Home</b>'}
   else{$('olhoMod').textContent=m[1];$('tituloMod').textContent=nomeT;$('subMod').hidden=true;$('trilha').innerHTML='Sistema PKS<span class="sep">/</span>'+m[1]+(m[1]!==nomeT?'<span class="sep">/</span><b>'+nomeT+'</b>':'')}
   document.querySelector('.topo').classList.toggle('topo-home',t==='home');
-  const nb=$('countsBox');if(nb)nb.hidden=t!=='notas';document.querySelector('.topo').hidden=t==='nfe';const pp=$('perPanel');if(pp&&t!=='notas')pp.hidden=true;
+  const nb=$('countsBox');if(nb)nb.hidden=t!=='notas';document.querySelector('.topo').hidden=t==='nfe'||t==='pcpvaeso';const pp=$('perPanel');if(pp&&t!=='notas')pp.hidden=true;
   if(t==='config')renderConfig();
   if(window.MOD)window.MOD.mostrar(t)}
 const abaAtual=()=>ABAS.includes(location.hash.slice(1))?location.hash.slice(1):'home';

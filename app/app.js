@@ -35,7 +35,7 @@ const RECEITA=new Set(['101','102','103','104','105','106','109','110','111','11
 const DEVOL=new Set(['201','202','410','411']);
 const diasUteis=(de,ate)=>{let n=0;for(let d=de;d<=ate;d=somaDias(d,1)){const w=isoDe(d).getDay();if(w&&w<6)n++}return n};
 
-const ST={tela:'inicio',mes:HOJE.slice(0,7),fat:{esc:'mes',dev:false},cnf:{sub:null,todos:false,aberto:null},pcp:{aba:'abertas',aberta:null,q:'',ap:null,msg:''},
+const ST={tela:'inicio',mes:HOJE.slice(0,7),fat:{esc:'mes',dev:false},cnf:{sub:null,todos:false,aberto:null},pcp:{prodz:false,aba:'abertas',aberta:null,q:'',ap:null,msg:''},
   dados:{},custos:{},ops:null,prods:{},marcas:{},sync:null,abas:[],nome:''};
 
 /* ---------- tema (o mesmo do site: pks_tema) ---------- */
@@ -216,6 +216,11 @@ async function telaCnf(){
 }
 
 /* ---------- PCP: ordens de produção da Vaeso ---------- */
+function quadroProduzidos(){
+  const hoje=PCP.diaSP(Date.now()),r=PCP.produzidosNosDias(ST.ops,hoje),ab=ST.pcp.prodz,dn=d=>d===hoje?'hoje':DIAS[isoDe(d).getDay()]+' '+ddmm(d);
+  return `<section class="cartao dobra${ab?' aberta':''}"><button type="button" class="cab bt-dobra" data-prodz aria-expanded="${ab}"><h2>Produzidos <small class="mudo">últimos 7 dias</small></h2><span class="pz-t"><b>${n0(r.total)} pç</b>${svg('seta','chev')}</span></button>
+  ${!ab?'':`<div class="pz-d">${r.dias.map(d=>`<div class="${d===hoje?'hoje':''}"><span>${dn(d)}</span><b>${n0(r.porDia[d])}</b></div>`).join('')}</div>${r.linhas.length?`<ul class="mini">${r.linhas.map(l=>`<li><span><b>${esc(l.desc||l.sku)}</b><small>${esc(l.sku)} · ${r.dias.filter(d=>l.dias[d]).map(d=>dn(d)+': '+n0(l.dias[d])).join(' · ')}</small></span><span class="n"><b>${n0(l.total)}</b></span></li>`).join('')}</ul>`:'<p class="mudo">Nenhuma produção apontada nos últimos 7 dias.</p>'}`}</section>`;
+}
 function telaPcp(){
   const box=$('tela');
   if(!ST.ops){box.innerHTML=topo(false)+esperando('Carregando as ordens de produção…');return}
@@ -227,6 +232,7 @@ function telaPcp(){
   const ped=linAb.reduce((a,r)=>a+r.qtd,0),feito=linAb.reduce((a,r)=>a+(r.prod||0),0);
   let h=topo(false,ST.sync?.ultimoPuxar?'Atualizado em '+quandoTxt(ST.sync.ultimoPuxar):'')+
   `<section class="heroi"><span class="olho">Linhas em aberto</span><b>${n0(linAb.length)}</b><span class="pilula">${pl(comLinha.length,'ordem','ordens')} · ${n0(ped)} peças · <strong>${F0.format(ped?feito/ped*100:0)}% produzido</strong></span></section>
+  ${quadroProduzidos()}
   <div class="seg largo" role="group" aria-label="Situação">${[['abertas','Em aberto',linAb.length],['finalizadas','Finalizadas',nFin]].map(([k,l,n])=>`<button type="button" data-paba="${k}" aria-pressed="${p.aba===k}">${l} ${n0(n)}</button>`).join('')}</div>
   ${p.msg?`<p class="aviso${p.msgErro?' erro':''}" role="status">${esc(p.msg)}</p>`:''}`;
   const lista=(p.aba==='abertas'?ab:fin).filter(o=>PCP.casa(o,p.q,p.aba==='abertas'?o.abertas:o.finalizadas));
@@ -302,6 +308,7 @@ document.addEventListener('click',async e=>{const t=e.target;
   if(t.closest('[data-todos]')){ST.cnf.todos=!ST.cnf.todos;desenha();return}
   const cn=t.closest('[data-cnf]');if(cn){ST.cnf.aberto=ST.cnf.aberto===cn.dataset.cnf?null:cn.dataset.cnf;desenha();return}
   const P=ST.pcp,pa=t.closest('[data-paba]');if(pa){P.aba=pa.dataset.paba;P.ap=null;P.aberta=null;P.msg='';desenha();return}
+  if(t.closest('[data-prodz]')){P.prodz=!P.prodz;desenha();return}
   if(P.ocup)return;
   const od=t.closest('[data-ord]');if(od){P.aberta=P.aberta===od.dataset.ord?null:od.dataset.ord;P.ap=null;P.msg='';desenha();return}
   const ap=t.closest('[data-ap]');if(ap){P.ap={k:ap.dataset.ap,modo:'',val:'',erro:''};P.msg='';desenha();return}
