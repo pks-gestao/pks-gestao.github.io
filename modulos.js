@@ -749,17 +749,17 @@ function exportaCnf(){const R=M._cnfExport&&M._cnfExport();if(!R)return;
 /* ---------- Estoque de produtos de venda (pedido do Chai, 25/11/2026) ---------- */
 /* Uma linha por produto e cliente, dos CFOPs de receita. Só a Vaeso tem saldo por enquanto:
    entrada = apontamento de produção das ordens (vaeso_ops, total confirmado de cada item, no dia da confirmação);
-   saída = NF de receita emitida para a Vaeso e não cancelada. Os dois contam a partir do início do controle.
+   saída = NF de receita emitida para a Vaeso e não cancelada. Estoque inicial zerado em 25/11/2026 (Chai): só conta o que veio depois (ESTOQUE_ZERO).
    Saldo negativo = saiu na nota mais do que foi apontado. Os outros clientes ainda não têm entrada: saldo null. */
-const ESTOQUE_INICIO='2026-11-25';
-function estoquePks(linhas,ops,inicio,ehReceita,ehDaVaeso,dia){
+const ESTOQUE_ZERO={em:'2026-11-25T18:29:55Z',dia:'2026-11-25',nota:28230};
+function estoquePks(linhas,ops,zero,ehReceita,ehDaVaeso,dia){
   const g=new Map(),cod=v=>String(v||'').trim().toUpperCase(),vaeso=linhas.find(l=>ehDaVaeso(l.destNome))?.destNome||'VAESO';
   const linha=(c,cli,desc,un)=>{const k=c+'|'+cli;let o=g.get(k);if(!o){o={k,cod:c,desc,un,cli,vae:ehDaVaeso(cli),ent:0,sai:0,saldo:null,mov:[],ult:''};g.set(k,o)}return o};
   for(const l of linhas){if(!ehReceita(l.cfop))continue;const c=cod(l.cod);if(!c)continue;const o=linha(c,l.destNome,l.desc,l.un);
     if(l.data>=o.ult){o.ult=l.data;o.desc=l.desc||o.desc}
-    if(o.vae&&l.data>=inicio){o.sai+=+l.q||0;o.mov.push({data:l.data,tipo:'saida',doc:'NF '+(+l.nota||l.nota),q:+l.q||0})}}
+    if(o.vae&&l.data>=zero.dia&&+l.nota>zero.nota){o.sai+=+l.q||0;o.mov.push({data:l.data,tipo:'saida',doc:'NF '+(+l.nota||l.nota),q:+l.q||0})}}
   for(const p of Object.values(ops||{}))for(const it of p.itens||[]){const c=cod(it.sku);if(!c)continue;const o=linha(c,vaeso,it.descricao||'','UN');
-    const q=+it.produzido?.qtd||0,em=it.produzido?.em;if(!q||!em)continue;const d=/^\d{4}-\d{2}-\d{2}$/.test(em)?em:dia(em);if(d<inicio)continue;
+    const q=+it.produzido?.qtd||0,em=it.produzido?.em;if(!q||!em)continue;const so=/^\d{4}-\d{2}-\d{2}$/.test(em),d=so?em:dia(em);if(so?em<=zero.dia:!(Date.parse(em)>Date.parse(zero.em)))continue;
     o.ent+=q;o.mov.push({data:d,tipo:'entrada',doc:(/^\d+$/.test(String(p.numero||''))?'OC '+p.numero:String(p.numero||'OC '+p.id))+(it.op_pks?' · OP '+it.op_pks:''),q})}
   for(const o of g.values()){if(!o.vae)continue;o.saldo=Math.round((o.ent-o.sai)*1000)/1000;o.mov.sort((a,b)=>b.data.localeCompare(a.data)||a.tipo.localeCompare(b.tipo))}
   return [...g.values()];
@@ -768,7 +768,7 @@ function renderEstoque(){
   const box=$('v-estoque'),L=fatLinhas();
   if(!L){box.innerHTML=esperando('Carregando o estoque…');carregar('faturamento').then(renderEstoque).catch(()=>box.innerHTML=esperando('Não foi possível carregar os produtos.'));return}
   if(!M.vxPronto&&S.db){box.innerHTML=esperando('Carregando os apontamentos…');return}
-  const T=estoquePks(L,M.vxOps,ESTOQUE_INICIO,c=>tipoCfop(c).t==='Receita',ehVaeso,diaSP);
+  const T=estoquePks(L,M.vxOps,ESTOQUE_ZERO,c=>tipoCfop(c).t==='Receita',ehVaeso,diaSP);
   const clientes=[...new Set(T.map(r=>r.cli))].sort(COLL.compare),cli=ui('est_pcli','todos'),q=ui('b_estq',''),aberto=ui('estq_open',()=>new Set());
   const R=T.filter(r=>(cli==='todos'||r.cli===cli)&&casa(`${r.cod} ${r.desc} ${r.cli}`,q)),soma=(rs,k)=>rs.reduce((a,r)=>a+(r[k]||0),0);
   const ultNf=L.reduce((m,l)=>l.data>m?l.data:m,''),semV='<span class="muted">–</span>';
@@ -777,7 +777,7 @@ function renderEstoque(){
     {k:'ent',l:'Entradas',num:1,v:r=>r.vae?r.ent:null,f:r=>r.vae?num(r.ent,2):semV},{k:'sai',l:'Saídas',num:1,v:r=>r.vae?r.sai:null,f:r=>r.vae?num(r.sai,2):semV},
     {k:'saldo',l:'Saldo estoque',num:1,f:r=>r.saldo===null?semV:`<b class="${r.saldo<0?'txt-stop':''}">${num(r.saldo,2)}</b>`}];
   const det=r=>`<tr><td colspan="7" class="detail"><div class="inner"><table><thead><tr><th>Data</th><th>Movimento</th><th>Documento</th><th class="num">Quantidade</th></tr></thead><tbody>${r.mov.map(m=>`<tr><td>${dt(m.data)}</td><td>${m.tipo==='entrada'?'Entrada · apontamento':'Saída · nota fiscal'}</td><td>${esc(m.doc)}</td><td class="num">${m.tipo==='entrada'?'':'−'}${num(m.q,2)}</td></tr>`).join('')}</tbody></table></div></td></tr>`;
-  box.innerHTML=`<p class="vx-busca">Vaeso desde ${dt(ESTOQUE_INICIO)}: entradas pelo apontamento, saídas pelas notas emitidas até ${dt(ultNf)}.</p>
+  box.innerHTML=`<p class="vx-busca">Vaeso zerado em ${dt(ESTOQUE_ZERO.dia)}: entradas pelo apontamento, saídas pelas notas emitidas até ${dt(ultNf)}.</p>
   <div class="tools filtros">${selUI('est_pcli',[['todos','Todos os clientes'],...PRINCIPAIS.map(([k,l])=>[clientes.find(c=>c.includes(k))||k,'★ '+l]),...clientes.map(c=>[c,c])],'Cliente')}${buscaUI('estq','Código, descrição ou cliente')}</div>`+
   tabela('estq',cols,R,{ordem:'saldo',desc:true,porPagina:50,cls:'compacto fit',vazio:'Nenhum produto com esse filtro.',
     linha:r=>r.mov.length?` data-estq="${esc(r.k)}" class="row" tabindex="0" aria-expanded="${aberto.has(r.k)}"`:'',depois:r=>r.mov.length&&aberto.has(r.k)?det(r):'',
