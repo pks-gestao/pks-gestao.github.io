@@ -1,6 +1,6 @@
 /* Painel PKS no celular (pedido do Chai, 23/11/2026), no formato do Painel Vaeso: tela inicial em blocos e, em cada assunto,
    o número do mês em destaque, gráfico Dia/Semana/Mês, cartões de projeção e comparação e os detalhes principais.
-   Usa o mesmo login e os mesmos dados do site (../supa.js). Só leitura. As contas seguem as do sistema (plataforma-nf/modulos.js):
+   Usa o mesmo login e os mesmos dados do site (../supa.js). O PCP aponta produção pela mesma função do site (pks-vaeso); o resto é só leitura. As contas seguem as do sistema (plataforma-nf/modulos.js):
    - faturamento = itens com CFOP de receita; devoluções = entradas com CFOP x201, x202, x410, x411 (valor + IPI);
    - custo de compra = valor sem IPI, menos desconto, mais frete e despesas, menos ICMS; nas compras e industrializações
      (x101, x102, x124, x125, x401, x403) menos PIS 1,65% e COFINS 7,6%;
@@ -34,8 +34,8 @@ const RECEITA=new Set(['101','102','103','104','105','106','109','110','111','11
 const DEVOL=new Set(['201','202','410','411']);
 const diasUteis=(de,ate)=>{let n=0;for(let d=de;d<=ate;d=somaDias(d,1)){const w=isoDe(d).getDay();if(w&&w<6)n++}return n};
 
-const ST={tela:'inicio',mes:HOJE.slice(0,7),fat:{esc:'mes',dev:false},cnf:{sub:null,todos:false,aberto:null},pcp:{aberta:null},
-  dados:{},custos:{},ops:null,sync:null,abas:[],nome:''};
+const ST={tela:'inicio',mes:HOJE.slice(0,7),fat:{esc:'mes',dev:false},cnf:{sub:null,todos:false,aberto:null},pcp:{aba:'abertas',ap:null,msg:''},
+  dados:{},custos:{},ops:null,prods:{},marcas:{},sync:null,abas:[],nome:''};
 
 /* ---------- tema (o mesmo do site: pks_tema) ---------- */
 function aplicaTema(t){document.documentElement.dataset.theme=t;document.querySelector('meta[name=theme-color]')?.setAttribute('content',t==='dark'?'#18191c':'#f1f2f4')}
@@ -58,6 +58,9 @@ async function inicia(){
   ST.abas=liberadas;
   if(liberadas.includes('custo'))db.collection('custos').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());ST.custos=o;if(ST.tela==='custo')desenha()},()=>{});
   if(liberadas.includes('pcp')){db.collection('vaeso_ops').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());ST.ops=o;if(['pcp','inicio'].includes(ST.tela))desenha()},()=>{ST.ops={};desenha()});
+    ST.db=db;
+    db.collection('vaeso_prod').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());ST.prods=o;if(ST.tela==='pcp')desenha()},()=>{});
+    db.collection('pcp_linhas').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());ST.marcas=o;if(['pcp','inicio'].includes(ST.tela))desenha()},()=>{});
     db.doc('meta/vaeso_sync').onSnapshot(s=>{ST.sync=s.exists?s.data():null;if(ST.tela==='pcp')desenha()},()=>{})}
   addEventListener('hashchange',rota);rota();
 }
@@ -65,7 +68,8 @@ function rota(){const h=location.hash.slice(1);ST.tela=ST.abas.includes(h)?h:'in
 function desenha(){
   const box=$('tela');
   if(!ST.abas.length){box.innerHTML=topo()+esperando('<b>Seu acesso ainda não foi liberado.</b><br>Peça ao administrador do Sistema PKS para liberar Faturamento, Custo NF entrada ou Ordens de produção Vaeso.');return}
-  ({inicio:telaInicio,faturamento:telaFat,custo:telaCnf,pcp:telaPcp})[ST.tela]()}
+  ({inicio:telaInicio,faturamento:telaFat,custo:telaCnf,pcp:telaPcp})[ST.tela]();mostraAba()}
+new MutationObserver(mostraAba).observe($('tela'),{childList:true});
 
 /* ---------- topo: faixa do painel, mês, tema e sair ---------- */
 function topo(comMes,atualizado){
@@ -73,14 +77,20 @@ function topo(comMes,atualizado){
   return `<header class="faixa">${ST.tela!=='inicio'?`<a class="volta" href="#inicio" aria-label="Voltar ao início">${svg('volta')}</a>`:''}<b>PAINEL PKS</b><span class="selo" aria-hidden="true">PKS</span></header>
   <div class="barra">${comMes?`<label class="mes">${svg('cal','ic-mes')}<select id="mesSel" aria-label="Mês">${meses.map(m=>`<option value="${m}" ${m===ST.mes?'selected':''}>${mesNome(m)}</option>`).join('')}</select></label>`:'<span class="cresce"></span>'}
   <button type="button" class="bt-ic" id="temaBt" aria-label="Trocar entre tema claro e escuro">${svg('tema')}</button><button type="button" class="bt-ic" id="sairBt" aria-label="Sair">${svg('sai')}</button></div>
-  ${atualizado?`<p class="atual">${atualizado}</p>`:''}`;
+  ${abas()}${atualizado?`<p class="atual">${atualizado}</p>`:''}`;
 }
+
+/* Abas: rolam para o lado na faixa; arrastar a tela para o lado passa para a vizinha */
+const listaAbas=()=>['inicio',...TELAS.map(x=>x[0]).filter(k=>ST.abas.includes(k))];
+const nomeAba=k=>k==='inicio'?'Início':TELAS.find(x=>x[0]===k)[1];
+function abas(){if(!ST.abas.length)return '';return `<nav class="abas" aria-label="Telas do painel">${listaAbas().map(k=>`<a href="#${k}"${k===ST.tela?' aria-current="page"':''}>${nomeAba(k)}</a>`).join('')}</nav>`}
+function mostraAba(){const n=document.querySelector('.abas'),a=n?.querySelector('[aria-current]');if(a)n.scrollLeft=a.offsetLeft-n.offsetLeft-(n.clientWidth-a.offsetWidth)/2}
 
 /* ---------- início ---------- */
 function telaInicio(){
   const box=$('tela');const linha={};
   const fj=ST.dados.fatJ;if(fj&&ST.abas.includes('faturamento')){const B=fatBase();linha.faturamento=`${brl0(B.porMes.get(HOJE.slice(0,7))||0)} em ${MESES[+HOJE.slice(5,7)-1].toLowerCase()}`}
-  if(ST.ops){const ab=Object.values(ST.ops).filter(o=>o.status==='aberta');const at=ab.filter(o=>o.prevista_em&&o.prevista_em<HOJE).length;linha.pcp=`${pl(ab.length,'ordem aberta','ordens abertas')}${at?` · ${at} atrasada${at>1?'s':''}`:''}`}
+  if(ST.ops){const ab=PCP.montar(ST.ops,ST.prods,ST.marcas).filter(o=>o.abertas.length);const at=ab.filter(o=>o.prevista&&o.prevista<HOJE).length;linha.pcp=`${pl(ab.length,'ordem aberta','ordens abertas')}${at?` · ${at} atrasada${at>1?'s':''}`:''}`}
   const hr=new Date().getHours();
   box.innerHTML=topo(false)+`<section class="ola"><span class="olho">Visão geral</span><h1>${hr<12?'Bom dia':hr<18?'Boa tarde':'Boa noite'}${ST.nome?', '+esc(ST.nome):''}</h1><p>Acesse seus indicadores e operações.</p></section>
   <div class="blocos">${TELAS.filter(t=>ST.abas.includes(t[0])).map(([k,t,d,,ic])=>`<a class="bloco" href="#${k}"><span class="bola">${svg(ic)}</span><span class="bt-t"><b>${t}</b>${svg('seta','chev')}</span><small>${d}</small>${linha[k]?`<em>${esc(linha[k])}</em>`:''}</a>`).join('')}</div>
@@ -170,10 +180,11 @@ function cnfBase(){if(CNF)return CNF;const j=ST.dados.entJ,C=j.colunas,ix=n=>C.i
     const qive=r[0]==='Qive',cf=qive?cfopEntrada(r[I.cf]):String(r[I.cf]||''),v=x=>x>=0?+r[x]||0:0,icms=+r[I.icms]||0;
     const base=t-v(I.ds)+v(I.fr)+v(I.dp)-icms,cred=CRED_PC.has(cf.slice(1))?base*(0.0165+0.076):0;
     const forn=String(r[I.f]||r[I.fc]||''),cod=String(r[I.p]??'').trim(),key=qive?'q:'+(r[I.fc]||forn)+'|'+cod:'p:'+cod;
-    const it={q,t,preco:t/q,custo:(base-cred)/q,icms:t?icms/t:0,ipi:t?(+r[I.ipi]||0)/t:0,forn,data:String(r[I.e]||r[I.g]||'').slice(0,10),doc:String(r[I.doc]||'')};
+    const ipi=+r[I.ipi]||0,pago=t-v(I.ds)+v(I.fr)+v(I.dp)+ipi;
+    const it={q,pago,cfop:cf,compra:pago/q,custo:(base-cred)/q,ipi:ipi/q,icms:icms/q,pis:cred?base*0.0165/q:0,cofins:cred?base*0.076/q:0,forn,data:String(r[I.e]||r[I.g]||'').slice(0,10),doc:String(r[I.doc]||'')};
     const o=g.get(key)||{key,cod,desc:String(r[I.d]||cod),un:String(r[I.u]||'').toLowerCase()||'un',L:[]};o.L.push(it);g.set(key,o)}
-  CNF=[...g.values()].map(o=>{o.L.sort((a,b)=>b.data.localeCompare(a.data));const u=o.L.slice(0,5),ult=u[0],med=u.reduce((a,x)=>a+x.custo*x.q,0)/u.reduce((a,x)=>a+x.q,0);
-    return {...o,u,ult,med,var:med?(ult.custo-med)/med:0,data:ult.data,valor90:o.L.filter(x=>x.data>=somaDias(HOJE,-90)).reduce((a,x)=>a+x.t,0)}});
+  CNF=[...g.values()].map(o=>{o.L.sort((a,b)=>b.data.localeCompare(a.data));const u=o.L.slice(0,5),ult=u[0],qt=u.reduce((a,x)=>a+x.q,0),med=u.reduce((a,x)=>a+x.compra*x.q,0)/qt,medC=u.reduce((a,x)=>a+x.custo*x.q,0)/qt;
+    return {...o,u,ult,med,medC,var:med?(ult.compra-med)/med:0,data:ult.data,valor90:o.L.filter(x=>x.data>=somaDias(HOJE,-90)).reduce((a,x)=>a+x.pago,0)}});
   return CNF}
 async function telaCnf(){
   const box=$('tela');
@@ -182,51 +193,102 @@ async function telaCnf(){
   const temSub=SUBS.filter(s=>R.some(r=>subDe(r)===s));
   if(c.sub===null)c.sub=temSub[0]||'todas';
   const doMes=R.flatMap(r=>r.L.filter(x=>x.data.startsWith(m)).map(x=>({...x,r})));
-  const comprado=doMes.reduce((a,x)=>a+x.t,0),nfs=new Set(doMes.map(x=>x.doc+'|'+x.forn)).size;
+  const comprado=doMes.reduce((a,x)=>a+x.pago,0),nfs=new Set(doMes.map(x=>x.doc+'|'+x.forn)).size;
   const lim=somaDias(HOJE,-90);
   const lista=R.filter(r=>(c.sub==='todas'?r.L.length>=2:subDe(r)===c.sub)&&(c.todos||r.data>=lim)).sort((a,b)=>c.sub==='todas'?b.valor90-a.valor90||b.data.localeCompare(a.data):a.desc.localeCompare(b.desc,'pt-BR'));
   const vis=c.todos?lista:lista.slice(0,c.sub==='todas'?15:40);
   const sobe=lista.filter(r=>r.var>0.0005).length,cai=lista.filter(r=>r.var<-0.0005).length;
-  let h=topo(true,`Compras do Protheus e do Qive. Custo sem IPI e sem ICMS; nas compras e industrializações, sem PIS e COFINS.`)+
+  let h=topo(true,`Preço de compra com os impostos. Toque no produto para ver o custo.`)+
   `<section class="heroi"><span class="olho">Comprado em ${MESES[+m.slice(5)-1].toLowerCase()}</span><b>${brl0(comprado)}</b><span class="pilula">${pl(nfs,'nota','notas')} · ${pl(new Set(doMes.map(x=>x.r.key)).size,'material','materiais')}</span></section>
   <div class="chips" role="group" aria-label="Subclassificação">${[...temSub,'todas'].map(k=>`<button type="button" data-sub="${esc(k)}" aria-pressed="${c.sub===k}">${k==='todas'?'Mais comprados':esc(k)}</button>`).join('')}</div>
-  <div class="kpis"><div class="kpi c1"><span>Subiram</span><b class="neg">${n0(sobe)}</b><small>última compra acima da média</small></div><div class="kpi c2"><span>Caíram</span><b class="pos">${n0(cai)}</b><small>última compra abaixo da média</small></div></div>
-  <section class="cartao"><div class="cab"><h2>${svg('cnf','ic')}Preço de aquisição</h2><span class="mudo">${c.todos?'todas as compras':'últimos 90 dias'}</span></div><ul class="precos">`;
+  <div class="kpis"><div class="kpi c1"><span>Subiram</span><b class="neg">${n0(sobe)}</b><small>preço acima da média</small></div><div class="kpi c2"><span>Caíram</span><b class="pos">${n0(cai)}</b><small>preço abaixo da média</small></div></div>
+  <section class="cartao"><div class="cab"><h2>${svg('cnf','ic')}Preço de compra</h2><span class="mudo">${c.todos?'todas as compras':'últimos 90 dias'}</span></div><ul class="precos">`;
   for(const r of vis){const ab=c.aberto===r.key,v=r.var,vt=Math.abs(v)<0.0005?'=':pct(v);
     h+=`<li class="${ab?'aberta':''}"><button type="button" class="preco" data-cnf="${esc(r.key)}" aria-expanded="${ab}"><span class="p1"><b>${esc(r.desc)}</b><span class="var ${vt==='='?'':v>0?'sobe':'cai'}">${vt}</span></span>
-      <span class="p2"><small>${esc(nomeCurto(r.ult.forn))} · ${ddmm(r.data)}</small><span class="pv"><b>${brl(r.ult.custo)}</b><small>/${esc(r.un)}</small></span></span></button>`;
-    if(ab)h+=`<div class="tab"><p class="mudo">Últimas ${r.u.length} compras · média ${brl(r.med)}/${esc(r.un)}</p><table><thead><tr><th>Data</th><th>Fornecedor</th><th class="n">Qtde</th><th class="n">Preço NF</th><th class="n">Custo</th></tr></thead><tbody>${r.u.map(x=>`<tr><td>${ddmm(x.data)}</td><td>${esc(nomeCurto(x.forn).split(' ').slice(0,2).join(' '))}</td><td class="n">${nf(0,2).format(x.q)}</td><td class="n">${F2.format(x.preco)}</td><td class="n"><b>${F2.format(x.custo)}</b></td></tr>`).join('')}</tbody></table></div>`;
+      <span class="p2"><small>${esc(nomeCurto(r.ult.forn))} · ${ddmm(r.data)}</small><span class="pv"><b>${brl(r.ult.compra)}</b><small>/${esc(r.un)}</small></span></span></button>`;
+    if(ab){const x0=r.ult,d4=v=>Math.abs(v)<0.1&&v?'R$ '+nf(2,4).format(v):brl(v),li=(n,v,cl='')=>`<li class="${cl}"><span>${n}</span><b>${v}</b></li>`;
+      h+=`<div class="tab"><ul class="conta">${li('Preço de compra com impostos',d4(x0.compra))}${x0.ipi?li('IPI','− '+d4(x0.ipi),'men'):''}${x0.icms?li('ICMS','− '+d4(x0.icms),'men'):''}${x0.pis?li('PIS 1,65%','− '+d4(x0.pis),'men')+li('COFINS 7,6%','− '+d4(x0.cofins),'men'):''}${li('Custo por '+esc(r.un),d4(x0.custo),'fim')}</ul>
+      ${x0.ipi||x0.icms||x0.pis?'':`<p class="mudo">Esta nota não tem imposto destacado${x0.cfop?' (CFOP '+esc(x0.cfop)+')':''}.</p>`}<p class="mudo">Últimas ${r.u.length} compras · preço médio ${brl(r.med)} · custo médio ${brl(r.medC)}</p><table><thead><tr><th>Data</th><th>Fornecedor</th><th class="n">Qtde</th><th class="n">Com imp.</th><th class="n">Custo</th></tr></thead><tbody>${r.u.map(x=>`<tr><td>${ddmm(x.data)}</td><td>${esc(nomeCurto(x.forn).split(' ').slice(0,2).join(' '))}</td><td class="n">${nf(0,2).format(x.q)}</td><td class="n">${F2.format(x.compra)}</td><td class="n"><b>${F2.format(x.custo)}</b></td></tr>`).join('')}</tbody></table></div>`}
     h+='</li>'}
   h+=`</ul>${!vis.length?'<p class="mudo">Nenhuma compra nesse grupo nos últimos 90 dias.</p>':''}${lista.length>vis.length||c.todos?`<button type="button" class="mais" data-todos>${c.todos?'Só os últimos 90 dias':'Ver todos ('+n0(lista.length)+')'}</button>`:''}</section>`;
   box.innerHTML=h;
 }
 
 /* ---------- PCP: ordens de produção da Vaeso ---------- */
-const vxNumero=o=>/^\d+$/.test(String(o.numero||''))?'OC '+o.numero:String(o.numero||'OC '+o.id);
 function telaPcp(){
   const box=$('tela');
   const quando=ST.sync?.em?new Date(ST.sync.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).replace(',',' às'):'–';
   if(!ST.ops){box.innerHTML=topo(false)+esperando('Carregando as ordens de produção…');return}
-  const p=ST.pcp;
-  const O=Object.values(ST.ops).map(o=>{const itens=(o.itens||[]).map(it=>({sku:it.sku||'',desc:it.descricao||'',op:it.op_pks||'',qtd:+it.qtd||0,ent:+it.entregue||0,prod:it.produzido?+it.produzido.qtd||0:null}));
-    const ped=itens.reduce((a,r)=>a+r.qtd,0),feito=itens.reduce((a,r)=>a+(r.prod||0),0);
-    return {id:String(o.id),numero:vxNumero(o),emitida:o.emitida_em||'',prevista:o.prevista_em||'',status:o.status,itens,ped,feito,pct:ped?Math.min(1,feito/ped):0,atu:o.atualizado_em||''}});
-  const ab=O.filter(o=>o.status==='aberta').sort((a,b)=>(a.prevista||'9').localeCompare(b.prevista||'9'));
-  const atras=ab.filter(o=>o.prevista&&o.prevista<HOJE),sem7=ab.filter(o=>o.prevista&&o.prevista>=HOJE&&o.prevista<=somaDias(HOJE,7));
-  const ped=ab.reduce((a,o)=>a+o.ped,0),feito=ab.reduce((a,o)=>a+o.feito,0),semProd=ab.flatMap(o=>o.itens).filter(r=>r.prod===null).length;
-  const finMes=O.filter(o=>o.status!=='aberta'&&String(o.atu||o.prevista).startsWith(HOJE.slice(0,7))).length;
+  const p=ST.pcp,O=PCP.montar(ST.ops,ST.prods,ST.marcas).filter(o=>o.status!=='cancelada');
+  const ab=O.filter(o=>o.status==='aberta'&&(o.abertas.length||o.encerrar)).sort((a,b)=>(a.prevista||'9').localeCompare(b.prevista||'9'));
+  const comLinha=ab.filter(o=>o.abertas.length),linAb=ab.flatMap(o=>o.abertas);
+  const fin=O.filter(o=>o.finalizadas.length).sort((a,b)=>{const u=o=>o.finalizadas.reduce((m,r)=>r.em>m?r.em:m,'')||o.prevista;return u(b).localeCompare(u(a))});
+  const nFin=fin.reduce((a,o)=>a+o.finalizadas.length,0);
+  const atras=comLinha.filter(o=>o.prevista&&o.prevista<HOJE),sem7=comLinha.filter(o=>o.prevista&&o.prevista>=HOJE&&o.prevista<=somaDias(HOJE,7));
+  const ped=linAb.reduce((a,r)=>a+r.qtd,0),feito=linAb.reduce((a,r)=>a+(r.prod||0),0);
   let h=topo(false,`Ordens do Gestão Vaeso, buscadas a cada 10 minutos. Última busca ${quando}.${ST.sync?.erro?' Erro na última busca.':''}`)+
-  `<section class="heroi"><span class="olho">Ordens em aberto</span><b>${n0(ab.length)}</b><span class="pilula">${n0(ped)} peças pedidas · <strong>${F0.format(ped?feito/ped*100:0)}% produzido</strong></span></section>
-  <div class="kpis"><div class="kpi c1"><span>Atrasadas</span><b class="${atras.length?'neg':''}">${n0(atras.length)}</b><small>prevista já passou</small></div><div class="kpi c2"><span>Entregar em 7 dias</span><b>${n0(sem7.length)}</b></div>
-    <div class="kpi c3"><span>Itens sem produzido</span><b>${n0(semProd)}</b><small>a confirmar no site</small></div><div class="kpi c4"><span>Finalizadas no mês</span><b>${n0(finMes)}</b></div></div>
-  <section class="cartao"><div class="cab"><h2>${svg('pcp','ic')}Próximas entregas</h2><span class="mudo">${pl(ab.length,'ordem','ordens')}</span></div><ul class="ordens">`;
-  for(const o of ab){const aberta=p.aberta===o.id,late=o.prevista&&o.prevista<HOJE;
-    h+=`<li class="${aberta?'aberta':''}"><button type="button" class="ordem" data-ord="${esc(o.id)}" aria-expanded="${aberta}"><span class="on"><b>${esc(o.numero)}</b><small class="${late?'neg':''}">${o.prevista?(late?'atrasada · ':'')+'prevista '+ddmm(o.prevista):'sem previsão'}</small></span>
-      <span class="op"><span class="barra"><i style="width:${o.pct*100}%"></i></span><small>${n0(o.feito)} de ${n0(o.ped)} pç</small></span>${svg('seta','chev')}</button>`;
-    if(aberta)h+=`<ul class="mini">${o.itens.map(r=>{const d=r.prod===null?null:r.prod-r.qtd;return `<li><span><b>${esc(r.desc||r.sku)}</b><small>${esc(r.sku)}${r.op?' · OP '+esc(r.op):''} · pedido ${n0(r.qtd)}${r.ent?' · entregue '+n0(r.ent):''}</small></span><span class="n">${r.prod===null?'<small class="mudo">sem produzido</small>':`<b>${n0(r.prod)}</b><small class="${Math.abs(d)<1?'pos':d<0?'neg':''}">${Math.abs(d)<1?'igual':d<0?'−'+n0(-d):'+'+n0(d)}</small>`}</span></li>`}).join('')}</ul>`;
-    h+='</li>'}
-  h+=`</ul>${ab.length?'':'<p class="mudo">Nenhuma ordem em aberto.</p>'}</section><p class="rodape">O produzido é confirmado no site do Sistema PKS (PCP › Ordens de produção Vaeso).</p>`;
+  `<section class="heroi"><span class="olho">Linhas em aberto</span><b>${n0(linAb.length)}</b><span class="pilula">${pl(comLinha.length,'ordem','ordens')} · ${n0(ped)} peças · <strong>${F0.format(ped?feito/ped*100:0)}% produzido</strong></span></section>
+  <div class="kpis"><div class="kpi c1"><span>Ordens atrasadas</span><b class="${atras.length?'neg':''}">${n0(atras.length)}</b></div><div class="kpi c2"><span>Entregar em 7 dias</span><b>${n0(sem7.length)}</b></div>
+    <div class="kpi c3"><span>Sem apontamento</span><b>${n0(linAb.filter(r=>r.prod===null).length)}</b></div><div class="kpi c4"><span>Linhas finalizadas</span><b>${n0(nFin)}</b></div></div>
+  <div class="seg largo" role="group" aria-label="Situação">${[['abertas','Em aberto',linAb.length],['finalizadas','Finalizadas',nFin]].map(([k,l,n])=>`<button type="button" data-paba="${k}" aria-pressed="${p.aba===k}">${l} ${n0(n)}</button>`).join('')}</div>
+  ${p.msg?`<p class="aviso${p.msgErro?' erro':''}" role="status">${esc(p.msg)}</p>`:''}`;
+  const lista=p.aba==='abertas'?ab:fin;
+  for(const o of lista){const late=p.aba==='abertas'&&o.prevista&&o.prevista<HOJE,L=p.aba==='abertas'?o.abertas:o.finalizadas;
+    h+=`<section class="cartao oc"><div class="cab"><span class="on"><b>${esc(o.numero)}</b><small class="${late?'neg':''}">${o.prevista?(late?'atrasada · ':'')+'prevista '+ddmm(o.prevista):'sem previsão'}</small></span><span class="op"><span class="barra"><i style="width:${o.pct*100}%"></i></span><small>${n0(o.feito)} de ${n0(o.ped)} pç</small></span></div>
+    ${L.map(linhaPcp).join('')}${p.aba==='abertas'&&o.encerrar?`<p class="mudo">Todas as linhas foram finalizadas, mas a ordem continua aberta na Vaeso.</p><button type="button" class="ac prim" data-encoc="${esc(o.id)}" ${p.ocup?'disabled':''}>Encerrar ${esc(o.numero)}</button>`:''}</section>`}
+  if(!lista.length)h+=esperando(p.aba==='abertas'?'Nenhuma linha em aberto.':'Nenhuma linha finalizada.');
+  const foco=document.activeElement?.id==='apQtd';
   box.innerHTML=h;
+  const inp=$('apQtd');if(inp&&(foco||p.foco)){p.foco=false;inp.focus()}
+}
+function linhaPcp(r){
+  const p=ST.pcp,a=p.ap&&p.ap.k===r.k?p.ap:null,d=r.prod===null?null:r.prod-r.qtd;
+  const selo=d===null?'':Math.abs(d)<1?'<i class="ok">igual</i>':d<0?`<i class="falta">−${n0(-d)}</i>`:`<i class="mais">+${n0(d)}</i>`;
+  return `<div class="lin"><div class="lin-t"><span><b>${esc(r.desc||r.sku)}</b><small>${esc(r.sku)}${r.op?' · OP '+esc(r.op):''}${r.ent?' · entregue '+n0(r.ent):''}</small></span><span class="lin-q"><small>pedido</small><b>${n0(r.qtd)}</b></span><span class="lin-q"><small>produzido</small><b>${r.prod===null?'–':n0(r.prod)}</b>${selo}</span></div>
+  ${r.pendente?`<p class="aviso erro">${r.pendente.acao==='desfazer'?'Desfazer':'Apontamento de '+n0(r.pendente.qtd)} ainda não recebido pela Vaeso; o sistema tenta de novo a cada 10 minutos.${r.pendente.erro?' '+esc(r.pendente.erro):''}</p>`:''}
+  ${a?painelAp(r,a):!r.ordemAberta?'':`<div class="acoes">${r.sit==='aberta'?`<button type="button" class="ac prim" data-ap="${esc(r.k)}" ${p.ocup?'disabled':''}>${r.prod===null?'Apontar':'Alterar apontamento'}</button>`:`${r.marcada?`<button type="button" class="ac" data-reabre="${esc(r.k)}" ${p.ocup?'disabled':''}>Reabrir linha</button>`:`<button type="button" class="ac" data-ap="${esc(r.k)}" ${p.ocup?'disabled':''}>Alterar apontamento</button>`}`}</div>`}</div>`;
+}
+function painelAp(r,a){
+  const o=ST.pcp.ocup?'disabled':'';
+  if(a.perg)return `<div class="ap"><b>Foram ${n0(a.qtd)} de ${n0(r.qtd)} peças. Encerrar esta linha ou continuar aberta?</b>${a.ultima?`<p class="mudo">É a última linha aberta: ao encerrar, a ${esc(r.oc)} também é encerrada na Vaeso.</p>`:''}
+    <div class="acoes"><button type="button" class="ac prim" data-fim="encerra" ${o}>Encerrar linha</button><button type="button" class="ac" data-fim="continua" ${o}>Continuar aberta</button><button type="button" class="ac" data-fim="cancela" ${o}>Voltar</button></div>${a.erro?`<p class="aviso erro" role="alert">${esc(a.erro)}</p>`:''}</div>`;
+  return `<div class="ap"><b>Quanto foi produzido no total?</b><div class="acoes"><button type="button" class="ac prim" data-modo="igual" ${o}>Igual à ordem · ${n0(r.qtd)}</button><button type="button" class="ac" data-modo="mais" aria-pressed="${a.modo==='mais'}" ${o}>A mais</button><button type="button" class="ac" data-modo="menos" aria-pressed="${a.modo==='menos'}" ${o}>A menos</button></div>
+    ${a.modo?`<label class="ap-q"><span>Total produzido (${a.modo==='menos'?'menor':'maior'} que ${n0(r.qtd)})</span><input id="apQtd" type="text" inputmode="numeric" autocomplete="off" value="${esc(a.val||'')}"></label><button type="button" class="ac prim" data-apok ${o}>${ST.pcp.ocup?'Enviando…':'Confirmar'}</button>`:ST.pcp.ocup?'<p class="mudo">Enviando…</p>':''}
+    ${a.erro?`<p class="aviso erro" role="alert">${esc(a.erro)}</p>`:''}
+    <div class="acoes">${r.prod!==null?`<button type="button" class="ac" data-desf ${o}>Desfazer apontamento</button>`:''}<button type="button" class="ac" data-apfecha ${o}>Fechar</button></div></div>`;
+}
+const linhas=()=>PCP.montar(ST.ops,ST.prods,ST.marcas).flatMap(o=>o.itens);
+const ordemDe=id=>PCP.montar(ST.ops,ST.prods,ST.marcas).find(o=>o.id===String(id));
+async function relerPcp(){for(const [c,k] of [['vaeso_ops','ops'],['vaeso_prod','prods'],['pcp_linhas','marcas']]){const s=await ST.db.collection(c).get();const o={};s.docs.forEach(d=>o[d.id]=d.data());ST[k]=o}}
+function avisa(m,erro){ST.pcp.msg=m;ST.pcp.msgErro=!!erro}
+/* Encerra a ordem na Vaeso quando todas as linhas acabaram e alguma ficou a menos */
+async function encerraOrdem(id){const o=ordemDe(id);if(!o?.encerrar)return false;await window.pksFuncao('pks-vaeso',{acao:'encerrar',op_id:o.op_id});return true}
+/* Aponta o total produzido. encerra: true (encerrar a linha a menos), false (continuar aberta) */
+async function aponta(r,qtd,conferencia,encerra){
+  const p=ST.pcp;if(p.ocup)return;p.ocup=true;p.msg='';if(p.ap)p.ap.erro='';desenha();
+  let enviado=false,feito=false;
+  try{
+    const corpo={acao:'confirmar',op_id:r.op_id,produto_id:r.produto_id,conferencia};if(conferencia!=='igual')corpo.qtd=qtd;
+    enviado=!!(await window.pksFuncao('pks-vaeso',corpo))?.enviado;feito=true;
+    if(conferencia==='menos'&&encerra)await ST.db.doc('pcp_linhas/'+r.k).set({encerrada:true,qtd,op_id:r.op_id,produto_id:r.produto_id,em:new Date().toISOString()});
+    else if(ST.marcas[r.k])await ST.db.doc('pcp_linhas/'+r.k).delete();
+    await relerPcp();
+    const fechou=enviado&&await encerraOrdem(r.op_id);if(fechou)await relerPcp();
+    p.ap=null;
+    avisa(!enviado?'Apontamento gravado, mas a Vaeso ainda não recebeu. O sistema tenta de novo a cada 10 minutos.':fechou?`Produção enviada. ${r.oc} encerrada na Vaeso.`:conferencia==='menos'&&!encerra?'Produção enviada. A linha continua aberta.':'Produção enviada. Linha finalizada.',!enviado);
+  }catch(e){
+    const m=e.message||'Não foi possível concluir.';
+    if(feito){await relerPcp().catch(()=>{});p.ap=null;avisa('A produção foi apontada, mas o encerramento não foi concluído: '+m,true)}
+    else if(p.ap)p.ap.erro=m;else avisa(m,true)}
+  p.ocup=false;desenha();
+}
+async function fazPcp(fn,ok){const p=ST.pcp;if(p.ocup)return;p.ocup=true;p.msg='';desenha();
+  try{const r=await fn();await relerPcp();p.ap=null;avisa(r||ok)}catch(e){avisa(e.message||'Não foi possível concluir.',true)}p.ocup=false;desenha()}
+function confirmaAp(modo){
+  const p=ST.pcp,a=p.ap,r=a&&linhas().find(x=>x.k===a.k);if(!r||p.ocup)return;
+  const c=PCP.conferir(modo,a.val,r.qtd);if(c.erro){a.erro=c.erro;desenha();return}
+  if(c.conferencia!=='menos'){aponta(r,c.qtd,c.conferencia);return}
+  a.perg=true;a.qtd=c.qtd;a.erro='';a.ultima=ordemDe(r.op_id).itens.every(x=>x.k===r.k||x.sit==='finalizada');desenha();
 }
 
 /* ---------- eventos ---------- */
@@ -238,8 +300,29 @@ document.addEventListener('click',async e=>{const t=e.target;
   const sb=t.closest('[data-sub]');if(sb){ST.cnf.sub=sb.dataset.sub;ST.cnf.aberto=null;ST.cnf.todos=false;desenha();return}
   if(t.closest('[data-todos]')){ST.cnf.todos=!ST.cnf.todos;desenha();return}
   const cn=t.closest('[data-cnf]');if(cn){ST.cnf.aberto=ST.cnf.aberto===cn.dataset.cnf?null:cn.dataset.cnf;desenha();return}
-  const od=t.closest('[data-ord]');if(od){ST.pcp.aberta=ST.pcp.aberta===od.dataset.ord?null:od.dataset.ord;desenha();return}
+  const P=ST.pcp,pa=t.closest('[data-paba]');if(pa){P.aba=pa.dataset.paba;P.ap=null;P.msg='';desenha();return}
+  if(P.ocup)return;
+  const ap=t.closest('[data-ap]');if(ap){P.ap={k:ap.dataset.ap,modo:'',val:'',erro:''};P.msg='';desenha();return}
+  if(t.closest('[data-apfecha]')){P.ap=null;desenha();return}
+  const mo=t.closest('[data-modo]');if(mo&&P.ap){if(mo.dataset.modo==='igual')confirmaAp('igual');else{P.ap.modo=mo.dataset.modo;P.ap.erro='';P.foco=true;desenha()}return}
+  if(t.closest('[data-apok]')&&P.ap){confirmaAp(P.ap.modo);return}
+  const fi=t.closest('[data-fim]');if(fi&&P.ap){if(fi.dataset.fim==='cancela'){P.ap.perg=false;desenha();return}const r=linhas().find(x=>x.k===P.ap.k);if(r)aponta(r,P.ap.qtd,'menos',fi.dataset.fim==='encerra');return}
+  if(t.closest('[data-desf]')&&P.ap){const r=linhas().find(x=>x.k===P.ap.k);if(r&&confirm('Desfazer o apontamento deste produto, aqui e na Vaeso?'))fazPcp(async()=>{const x=await window.pksFuncao('pks-vaeso',{acao:'desfazer',op_id:r.op_id,produto_id:r.produto_id});if(ST.marcas[r.k])await ST.db.doc('pcp_linhas/'+r.k).delete();return x?.enviado?'Apontamento desfeito.':'Gravado. Será desfeito na Vaeso na próxima tentativa.'});return}
+  const rb=t.closest('[data-reabre]');if(rb){fazPcp(()=>ST.db.doc('pcp_linhas/'+rb.dataset.reabre).delete().then(()=>''),'Linha reaberta.');return}
+  const eo=t.closest('[data-encoc]');if(eo){const o=ordemDe(eo.dataset.encoc);if(o&&confirm(`Encerrar a ${o.numero} aqui e na Vaeso? Foram produzidas ${n0(o.feito)} de ${n0(o.ped)} peças.`))fazPcp(()=>encerraOrdem(o.id).then(()=>''),`${o.numero} encerrada na Vaeso.`);return}
 });
+document.addEventListener('input',e=>{if(e.target.id==='apQtd'&&ST.pcp.ap)ST.pcp.ap.val=e.target.value});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='apQtd'&&ST.pcp.ap&&!ST.pcp.ocup){e.preventDefault();confirmaAp(ST.pcp.ap.modo)}});
+/* Arrastar a tela para o lado troca de aba (menos dentro do que já rola para o lado e dos campos) */
+(function(){const m=$('tela');let g=null;
+  const solta=()=>{if(!g)return;g=null;m.style.transition='transform .18s';m.style.transform='';setTimeout(()=>{m.style.transition=''},200)};
+  m.addEventListener('touchstart',e=>{g=null;if(e.touches.length!==1||!ST.abas.length)return;const x=e.touches[0].clientX;
+    if(x<20||x>innerWidth-20||e.target.closest('.abas,.chips,.tab,input,select'))return;g={x,y:e.touches[0].clientY,dx:0,on:false}},{passive:true});
+  m.addEventListener('touchmove',e=>{if(!g)return;const dx=e.touches[0].clientX-g.x,dy=e.touches[0].clientY-g.y;
+    if(!g.on){if(Math.abs(dy)>10&&Math.abs(dy)>=Math.abs(dx)){g=null;return}if(Math.abs(dx)<14)return;g.on=true}
+    const L=listaAbas(),i=L.indexOf(ST.tela),tem=L[i+(dx<0?1:-1)];g.dx=dx;m.style.transform=`translateX(${dx*(tem?.6:.15)}px)`},{passive:true});
+  m.addEventListener('touchend',()=>{if(!g)return;const L=listaAbas(),para=g.on&&Math.abs(g.dx)>60?L[L.indexOf(ST.tela)+(g.dx<0?1:-1)]:null;solta();if(para)location.hash='#'+para});
+  m.addEventListener('touchcancel',solta)})();
 document.addEventListener('change',e=>{if(e.target.id==='mesSel'){ST.mes=e.target.value;desenha()}});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')desenha()});
 

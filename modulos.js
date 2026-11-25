@@ -777,6 +777,7 @@ function renderPcpVaeso(){
   if(!lista.length)h+=esperando(O.length?(aba==='abertas'?'Nenhuma ordem em aberto com esse filtro.':'Nenhuma ordem finalizada com esse filtro.'):'Nenhuma ordem recebida da Vaeso ainda.');
   const chip=r=>{if(!r.prod)return '<span class="muted">–</span>';const d=r.prod.qtd-r.qtd;
     return `${n0(r.prod.qtd)} ${Math.abs(d)<1?'<span class="pill p-done">igual</span>':d<0?`<span class="pill p-stop">−${n0(-d)}</span>`:`<span class="pill p-info">+${n0(d)}</span>`}<span class="small muted vx-quem">${dt(String(r.prod.em||'').slice(0,10))} · ${esc(r.prod.por||'')}</span>`};
+  const finLin=r=>r.status==='aberta'&&r.prod&&(r.prod.conferencia==='igual'||r.prod.conferencia==='mais'||+r.prod.qtd>=Math.round(r.qtd)||((M.vxLin||{})[r.k]?.encerrada&&+M.vxLin[r.k].qtd===+r.prod.qtd))?' <span class="pill p-done" title="Linha finalizada">Finalizada</span>':'';
   const envio=r=>!r.env||r.env.acao==='desfazer'&&r.env.envio==='enviado'?'':r.env.envio==='enviado'?'<span class="small vx-ok" title="Recebido pela Vaeso">✓ enviado</span>':`<span class="small txt-stop" title="${esc(r.env.erro||'')}">a enviar</span>`;
   const stPill=o=>o.status==='aberta'?(o.feito>0?'<span class="pill p-ready">Parcial</span>':'<span class="pill p-open">Em aberto</span>'):o.status==='cancelada'?'<span class="pill p-stop">Cancelada</span>':'<span class="pill p-done">Concluída</span>';
   for(const o of lista){
@@ -784,7 +785,7 @@ function renderPcpVaeso(){
       <div class="vx-prog" title="${num(o.pct,0)}% confirmado como produzido"><span class="small"><b>${n0(o.feito)}</b> de ${n0(o.ped)} pç</span><span class="pcp-bar"><i style="width:${o.pct}%"></i></span></div>
       ${site&&o.status==='aberta'?`<button type="button" class="bt vx-bt" data-vxenc="${esc(o.id)}" ${M.vxOcupado?'disabled':''}>Encerrar</button>`:''}</header>
       <div class="scroll"><table class="compacto fit vx-itens"><thead><tr><th>OP PKS</th><th>SKU</th><th>Descrição</th><th class="num">Pedido</th><th class="num">Entregue</th><th>Produzido PKS</th><th></th></tr></thead><tbody>${o.itens.map(r=>
-      `<tr><td class="mono">${r.opPks?esc(r.opPks):'<span class="muted">–</span>'}</td><td class="mono">${esc(r.sku)}</td><td class="trunca"><span title="${esc(r.desc)}">${esc(r.desc)}</span></td><td class="num">${num(r.qtd,2)}</td><td class="num">${num(r.entregue,2)}</td><td>${chip(r)} ${envio(r)}</td>
+      `<tr><td class="mono">${r.opPks?esc(r.opPks):'<span class="muted">–</span>'}</td><td class="mono">${esc(r.sku)}</td><td class="trunca"><span title="${esc(r.desc)}">${esc(r.desc)}</span></td><td class="num">${num(r.qtd,2)}</td><td class="num">${num(r.entregue,2)}</td><td>${chip(r)}${finLin(r)} ${envio(r)}</td>
        <td>${site&&o.status==='aberta'?`<button type="button" class="bt vx-bt" data-vxopen="${esc(r.k)}" aria-expanded="${aberto.has(r.k)}">${r.prod?'Alterar':'Produzido'}</button>`:''}</td></tr>${aberto.has(r.k)&&site&&o.status==='aberta'?vxPainel(r):''}`).join('')}</tbody></table></div></section>`;
   }
   box.innerHTML=h;
@@ -1100,6 +1101,7 @@ document.addEventListener('input',e=>{const t=e.target;if(t.dataset?.mb){M.ui['b
   S.db.doc('config/categorias').onSnapshot(s=>{M.cats=s.exists?(s.data().lista||[]):[];if(['forn','nfe'].includes(M.atual))rerender()},()=>{});
   S.db.collection('vaeso_ops').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxOps=o;M.vxPronto=true;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{M.vxPronto=true;if(M.atual==='pcpvaeso')rerender()});
   S.db.collection('vaeso_prod').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxProd=o;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
+  S.db.collection('pcp_linhas').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxLin=o;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
   S.db.doc('meta/vaeso_sync').onSnapshot(s=>{M.vxMeta=s.exists?s.data():null;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
   S.db.doc('config/contabilidade').onSnapshot(s=>{M.config=s.exists?s.data():{};if(['mc','dre','fpvenda'].includes(M.atual)&&!(document.activeElement?.dataset?.cfg))rerender()},()=>{});
   S.db.doc('config/fpvenda').onSnapshot(s=>{M.fpv=s.exists?s.data():{};if(M.atual==='fpvenda'&&!document.activeElement?.dataset?.fpvprem&&!document.activeElement?.dataset?.fpvkg)rerender()},()=>{});

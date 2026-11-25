@@ -2,8 +2,8 @@
    Busca sempre a versão mais nova; sem internet, abre a última tela guardada.
    Não intercepta o Supabase (login e dados) nem outros sites. */
 'use strict';
-const CACHE = 'painel-pks-v3';
-const BASE = ['./', 'app.js', 'manifest.webmanifest', 'icons/icon-192-v2.png', '../config.js', '../supa.js'];
+const CACHE = 'painel-pks-v4';
+const BASE = ['./', 'app.js', 'pcp-regra.js', 'manifest.webmanifest', 'icons/icon-192-v2.png', '../config.js', '../supa.js'];
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(BASE)).catch(() => null).then(() => self.skipWaiting()));
 });
