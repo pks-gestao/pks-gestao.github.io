@@ -35,6 +35,10 @@ function montar(ops,prods,marcas){
       /* todas as linhas prontas, alguma a menos: a Vaeso não encerra sozinha, é preciso encerrar a ordem */
       encerrar:aberta&&itens.length>0&&itens.every(r=>r.sit==='finalizada'&&!r.pendente)&&itens.some(r=>r.marcada)}});
 }
-const R={vxNumero,conferir,situacaoLinha,montar};
+/* Busca: todas as palavras no número da ordem, no código, na descrição ou na OP de um produto, sem ligar para acento */
+const limpo=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const casa=(o,q,L=o.itens)=>{const p=limpo(q).split(/\s+/).filter(Boolean);if(!p.length)return true;const tem=t=>p.every(w=>t.includes(w));const n=limpo(o.numero);
+  return tem(n)||L.some(r=>tem(n+' '+limpo(r.sku+' '+r.desc+' '+r.op)))};
+const R={casa,vxNumero,conferir,situacaoLinha,montar};
 if(typeof module!=='undefined'&&module.exports)module.exports=R;else raiz.PCP=R;
 })(typeof window!=='undefined'?window:globalThis);

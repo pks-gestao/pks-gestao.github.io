@@ -29,12 +29,13 @@ const mesNome=m=>MESES[+m.slice(5,7)-1]+' '+m.slice(0,4);
 const DIAS=['dom','seg','ter','qua','qui','sex','sáb'];
 const pl=(n,a,b)=>n0(n)+' '+(n===1?a:b);
 const nomeCurto=s=>String(s||'').replace(/\b(LTDA|S\/A|S\.A\.|EIRELI|ME|EPP)\b\.?/gi,'').trim().split(/\s+/).slice(0,3).join(' ');
+const quandoTxt=v=>new Date(v).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).replace(',',' às');
 const linhasDe=j=>j.linhas.map(r=>Object.fromEntries(j.colunas.map((c,i)=>[c,r[i]])));
 const RECEITA=new Set(['101','102','103','104','105','106','109','110','111','116','117','118','119','120','122','123','124','125','401','402','403','405','551']);
 const DEVOL=new Set(['201','202','410','411']);
 const diasUteis=(de,ate)=>{let n=0;for(let d=de;d<=ate;d=somaDias(d,1)){const w=isoDe(d).getDay();if(w&&w<6)n++}return n};
 
-const ST={tela:'inicio',mes:HOJE.slice(0,7),fat:{esc:'mes',dev:false},cnf:{sub:null,todos:false,aberto:null},pcp:{aba:'abertas',ap:null,msg:''},
+const ST={tela:'inicio',mes:HOJE.slice(0,7),fat:{esc:'mes',dev:false},cnf:{sub:null,todos:false,aberto:null},pcp:{aba:'abertas',aberta:null,q:'',ap:null,msg:''},
   dados:{},custos:{},ops:null,prods:{},marcas:{},sync:null,abas:[],nome:''};
 
 /* ---------- tema (o mesmo do site: pks_tema) ---------- */
@@ -43,7 +44,7 @@ try{aplicaTema(localStorage.getItem('pks_tema')||'light')}catch{aplicaTema('ligh
 
 const carregar=nome=>ST.dados[nome]||(ST.dados[nome]=fetch(nome+'.json').then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}));
 const esperando=t=>`<div class="vazio">${t}</div>`;
-const IC={fat:'<path d="M5 20V11M11 20V5M17 20v-6"/>',cnf:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',pcp:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h5M8 17h7"/>',
+const IC={lupa:'<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',fat:'<path d="M5 20V11M11 20V5M17 20v-6"/>',cnf:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',pcp:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h5M8 17h7"/>',
   volta:'<path d="M15 6l-6 6 6 6"/>',cal:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',sai:'<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>',tema:'<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',seta:'<path d="M9 6l6 6-6 6"/>',dev:'<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>'};
 const svg=(k,cl='')=>`<svg class="${cl}" viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>`;
 const TELAS=[['faturamento','Faturamento','Acompanhe o desempenho do faturamento.','faturamento','fat'],['custo','Custo das entradas','Monitore o custo das matérias-primas.','custonf','cnf'],['pcp','PCP','Ordens de produção da Vaeso.','pcpvaeso','pcp']];
@@ -77,7 +78,7 @@ function topo(comMes,atualizado){
   return `<header class="faixa">${ST.tela!=='inicio'?`<a class="volta" href="#inicio" aria-label="Voltar ao início">${svg('volta')}</a>`:''}<b>PAINEL PKS</b><span class="selo" aria-hidden="true">PKS</span></header>
   <div class="barra">${comMes?`<label class="mes">${svg('cal','ic-mes')}<select id="mesSel" aria-label="Mês">${meses.map(m=>`<option value="${m}" ${m===ST.mes?'selected':''}>${mesNome(m)}</option>`).join('')}</select></label>`:'<span class="cresce"></span>'}
   <button type="button" class="bt-ic" id="temaBt" aria-label="Trocar entre tema claro e escuro">${svg('tema')}</button><button type="button" class="bt-ic" id="sairBt" aria-label="Sair">${svg('sai')}</button></div>
-  ${abas()}${atualizado?`<p class="atual">${atualizado}</p>`:''}`;
+  ${ST.tela==='inicio'?abas():''}${atualizado?`<p class="atual">${atualizado}</p>`:''}`;
 }
 
 /* Abas: rolam para o lado na faixa; arrastar a tela para o lado passa para a vizinha */
@@ -198,7 +199,7 @@ async function telaCnf(){
   const lista=R.filter(r=>(c.sub==='todas'?r.L.length>=2:subDe(r)===c.sub)&&(c.todos||r.data>=lim)).sort((a,b)=>c.sub==='todas'?b.valor90-a.valor90||b.data.localeCompare(a.data):a.desc.localeCompare(b.desc,'pt-BR'));
   const vis=c.todos?lista:lista.slice(0,c.sub==='todas'?15:40);
   const sobe=lista.filter(r=>r.var>0.0005).length,cai=lista.filter(r=>r.var<-0.0005).length;
-  let h=topo(true,`Preço de compra com os impostos. Toque no produto para ver o custo.`)+
+  let h=topo(true,ST.dados.entJ.geradoEm?'Atualizado em '+quandoTxt(ST.dados.entJ.geradoEm):'')+
   `<section class="heroi"><span class="olho">Comprado em ${MESES[+m.slice(5)-1].toLowerCase()}</span><b>${brl0(comprado)}</b><span class="pilula">${pl(nfs,'nota','notas')} · ${pl(new Set(doMes.map(x=>x.r.key)).size,'material','materiais')}</span></section>
   <div class="chips" role="group" aria-label="Subclassificação">${[...temSub,'todas'].map(k=>`<button type="button" data-sub="${esc(k)}" aria-pressed="${c.sub===k}">${k==='todas'?'Mais comprados':esc(k)}</button>`).join('')}</div>
   <div class="kpis"><div class="kpi c1"><span>Subiram</span><b class="neg">${n0(sobe)}</b><small>preço acima da média</small></div><div class="kpi c2"><span>Caíram</span><b class="pos">${n0(cai)}</b><small>preço abaixo da média</small></div></div>
@@ -217,29 +218,29 @@ async function telaCnf(){
 /* ---------- PCP: ordens de produção da Vaeso ---------- */
 function telaPcp(){
   const box=$('tela');
-  const quando=ST.sync?.em?new Date(ST.sync.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).replace(',',' às'):'–';
   if(!ST.ops){box.innerHTML=topo(false)+esperando('Carregando as ordens de produção…');return}
   const p=ST.pcp,O=PCP.montar(ST.ops,ST.prods,ST.marcas).filter(o=>o.status!=='cancelada');
   const ab=O.filter(o=>o.status==='aberta'&&(o.abertas.length||o.encerrar)).sort((a,b)=>(a.prevista||'9').localeCompare(b.prevista||'9'));
   const comLinha=ab.filter(o=>o.abertas.length),linAb=ab.flatMap(o=>o.abertas);
   const fin=O.filter(o=>o.finalizadas.length).sort((a,b)=>{const u=o=>o.finalizadas.reduce((m,r)=>r.em>m?r.em:m,'')||o.prevista;return u(b).localeCompare(u(a))});
   const nFin=fin.reduce((a,o)=>a+o.finalizadas.length,0);
-  const atras=comLinha.filter(o=>o.prevista&&o.prevista<HOJE),sem7=comLinha.filter(o=>o.prevista&&o.prevista>=HOJE&&o.prevista<=somaDias(HOJE,7));
   const ped=linAb.reduce((a,r)=>a+r.qtd,0),feito=linAb.reduce((a,r)=>a+(r.prod||0),0);
-  let h=topo(false,`Ordens do Gestão Vaeso, buscadas a cada 10 minutos. Última busca ${quando}.${ST.sync?.erro?' Erro na última busca.':''}`)+
+  let h=topo(false,ST.sync?.ultimoPuxar?'Atualizado em '+quandoTxt(ST.sync.ultimoPuxar):'')+
   `<section class="heroi"><span class="olho">Linhas em aberto</span><b>${n0(linAb.length)}</b><span class="pilula">${pl(comLinha.length,'ordem','ordens')} · ${n0(ped)} peças · <strong>${F0.format(ped?feito/ped*100:0)}% produzido</strong></span></section>
-  <div class="kpis"><div class="kpi c1"><span>Ordens atrasadas</span><b class="${atras.length?'neg':''}">${n0(atras.length)}</b></div><div class="kpi c2"><span>Entregar em 7 dias</span><b>${n0(sem7.length)}</b></div>
-    <div class="kpi c3"><span>Sem apontamento</span><b>${n0(linAb.filter(r=>r.prod===null).length)}</b></div><div class="kpi c4"><span>Linhas finalizadas</span><b>${n0(nFin)}</b></div></div>
   <div class="seg largo" role="group" aria-label="Situação">${[['abertas','Em aberto',linAb.length],['finalizadas','Finalizadas',nFin]].map(([k,l,n])=>`<button type="button" data-paba="${k}" aria-pressed="${p.aba===k}">${l} ${n0(n)}</button>`).join('')}</div>
   ${p.msg?`<p class="aviso${p.msgErro?' erro':''}" role="status">${esc(p.msg)}</p>`:''}`;
-  const lista=p.aba==='abertas'?ab:fin;
-  for(const o of lista){const late=p.aba==='abertas'&&o.prevista&&o.prevista<HOJE,L=p.aba==='abertas'?o.abertas:o.finalizadas;
-    h+=`<section class="cartao oc"><div class="cab"><span class="on"><b>${esc(o.numero)}</b><small class="${late?'neg':''}">${o.prevista?(late?'atrasada · ':'')+'prevista '+ddmm(o.prevista):'sem previsão'}</small></span><span class="op"><span class="barra"><i style="width:${o.pct*100}%"></i></span><small>${n0(o.feito)} de ${n0(o.ped)} pç</small></span></div>
-    ${L.map(linhaPcp).join('')}${p.aba==='abertas'&&o.encerrar?`<p class="mudo">Todas as linhas foram finalizadas, mas a ordem continua aberta na Vaeso.</p><button type="button" class="ac prim" data-encoc="${esc(o.id)}" ${p.ocup?'disabled':''}>Encerrar ${esc(o.numero)}</button>`:''}</section>`}
-  if(!lista.length)h+=esperando(p.aba==='abertas'?'Nenhuma linha em aberto.':'Nenhuma linha finalizada.');
+  const lista=(p.aba==='abertas'?ab:fin).filter(o=>PCP.casa(o,p.q,p.aba==='abertas'?o.abertas:o.finalizadas));
+  h+=`<label class="busca">${svg('lupa')}<input type="search" id="pcpQ" placeholder="Ordem, código ou descrição" autocomplete="off" value="${esc(p.q)}" aria-label="Buscar por número da ordem, código ou descrição do produto"></label>`;
+  if(lista.length)h+='<ul class="ordens">';
+  for(const o of lista){const aberto=p.aberta===o.id,late=p.aba==='abertas'&&o.prevista&&o.prevista<HOJE,L=p.aba==='abertas'?o.abertas:o.finalizadas;
+    h+=`<li class="${aberto?'aberta':''}"><button type="button" class="ordem" data-ord="${esc(o.id)}" aria-expanded="${aberto}"><span class="on"><b>${esc(o.numero)}</b>${o.prevista?`<small class="${late?'neg':''}">${late?'atrasada · ':''}prevista ${ddmm(o.prevista)}</small>`:''}${L.some(r=>r.pendente)?'<small class="neg">apontamento a enviar</small>':''}${p.aba==='abertas'&&o.encerrar?'<small class="neg">falta encerrar a ordem</small>':''}</span>${svg('seta','chev')}</button>
+    ${aberto?`<div class="prods">${L.map(linhaPcp).join('')}${p.aba==='abertas'&&o.encerrar?`<p class="mudo">Todas as linhas foram finalizadas, mas a ordem continua aberta na Vaeso.</p><button type="button" class="ac prim" data-encoc="${esc(o.id)}" ${p.ocup?'disabled':''}>Encerrar ${esc(o.numero)}</button>`:''}</div>`:''}</li>`}
+  if(lista.length)h+='</ul>';else h+=esperando(p.q?'Nenhuma ordem com essa busca.':p.aba==='abertas'?'Nenhuma linha em aberto.':'Nenhuma linha finalizada.');
+  const ae=document.activeElement,naBusca=ae?.id==='pcpQ',pos=naBusca?ae.selectionStart:0;
   const foco=document.activeElement?.id==='apQtd';
   box.innerHTML=h;
   const inp=$('apQtd');if(inp&&(foco||p.foco)){p.foco=false;inp.focus()}
+  if(naBusca){const n=$('pcpQ');n.focus();n.setSelectionRange(pos,pos)}
 }
 function linhaPcp(r){
   const p=ST.pcp,a=p.ap&&p.ap.k===r.k?p.ap:null,d=r.prod===null?null:r.prod-r.qtd;
@@ -300,8 +301,9 @@ document.addEventListener('click',async e=>{const t=e.target;
   const sb=t.closest('[data-sub]');if(sb){ST.cnf.sub=sb.dataset.sub;ST.cnf.aberto=null;ST.cnf.todos=false;desenha();return}
   if(t.closest('[data-todos]')){ST.cnf.todos=!ST.cnf.todos;desenha();return}
   const cn=t.closest('[data-cnf]');if(cn){ST.cnf.aberto=ST.cnf.aberto===cn.dataset.cnf?null:cn.dataset.cnf;desenha();return}
-  const P=ST.pcp,pa=t.closest('[data-paba]');if(pa){P.aba=pa.dataset.paba;P.ap=null;P.msg='';desenha();return}
+  const P=ST.pcp,pa=t.closest('[data-paba]');if(pa){P.aba=pa.dataset.paba;P.ap=null;P.aberta=null;P.msg='';desenha();return}
   if(P.ocup)return;
+  const od=t.closest('[data-ord]');if(od){P.aberta=P.aberta===od.dataset.ord?null:od.dataset.ord;P.ap=null;P.msg='';desenha();return}
   const ap=t.closest('[data-ap]');if(ap){P.ap={k:ap.dataset.ap,modo:'',val:'',erro:''};P.msg='';desenha();return}
   if(t.closest('[data-apfecha]')){P.ap=null;desenha();return}
   const mo=t.closest('[data-modo]');if(mo&&P.ap){if(mo.dataset.modo==='igual')confirmaAp('igual');else{P.ap.modo=mo.dataset.modo;P.ap.erro='';P.foco=true;desenha()}return}
@@ -311,7 +313,7 @@ document.addEventListener('click',async e=>{const t=e.target;
   const rb=t.closest('[data-reabre]');if(rb){fazPcp(()=>ST.db.doc('pcp_linhas/'+rb.dataset.reabre).delete().then(()=>''),'Linha reaberta.');return}
   const eo=t.closest('[data-encoc]');if(eo){const o=ordemDe(eo.dataset.encoc);if(o&&confirm(`Encerrar a ${o.numero} aqui e na Vaeso? Foram produzidas ${n0(o.feito)} de ${n0(o.ped)} peças.`))fazPcp(()=>encerraOrdem(o.id).then(()=>''),`${o.numero} encerrada na Vaeso.`);return}
 });
-document.addEventListener('input',e=>{if(e.target.id==='apQtd'&&ST.pcp.ap)ST.pcp.ap.val=e.target.value});
+document.addEventListener('input',e=>{if(e.target.id==='pcpQ'){ST.pcp.q=e.target.value;desenha();return}if(e.target.id==='apQtd'&&ST.pcp.ap)ST.pcp.ap.val=e.target.value});
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='apQtd'&&ST.pcp.ap&&!ST.pcp.ocup){e.preventDefault();confirmaAp(ST.pcp.ap.modo)}});
 /* Arrastar a tela para o lado troca de aba (menos dentro do que já rola para o lado e dos campos) */
 (function(){const m=$('tela');let g=null;
