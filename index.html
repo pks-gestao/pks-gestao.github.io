@@ -761,6 +761,7 @@ tr.vx-painel td{background:var(--sunken)}
   <section id="v-roteiro" class="section" hidden></section>
   <section id="v-mc" class="section" hidden></section>
   <section id="v-dre" class="section" hidden></section>
+  <section id="v-estoque" class="section" hidden></section>
   <section id="v-pcpvaeso" class="section" hidden></section>
   <section id="v-config" class="section" hidden></section>
   <section id="v-bloqueio" class="section" hidden></section>
@@ -866,11 +867,13 @@ const IC={home:'<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/>',
   entradas:'<path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 19h14"/>',
   faturamento:'<path d="M4 5h2l2 10h10l2-7H7"/><circle cx="10" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/>',
   estruturas:'<path d="M12 3l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4M4 17l8 4 8-4"/>',
+  estoque:'<path d="M4 8l8-4 8 4v9l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v9"/>',
   pcp:'<path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5M4 9h0"/><circle cx="17" cy="15" r="0.6"/>',
   contabilidade:'<path d="M6 3h11a2 2 0 0 1 2 2v16H8a2 2 0 0 1-2-2z"/><path d="M6 19a2 2 0 0 1 2-2h11M10 8h6M10 12h4"/>'};
 const MODS=[['home','Home',[['home','Home']]],['cadastros','Cadastros',[['-','Classificação'],['forn','Fornecedores'],['cfop','CFOP'],['-','Clientes e produtos'],['clientes','Clientes'],['produtos','Produtos']]],
   ['entradas','Entradas',[['-','Lançador de NF'],['notas','Notas para lançar'],['entrada','Entrada de Notas'],['lancadas','Lançadas'],['padrao','Padrão de lançamento'],['-','Análise'],['nfe','NF-e'],['custonf','Custo NF entrada']]],
   ['estruturas','Estruturas',[['estrutura','Estrutura do produto'],['formacao','Formação de preço'],['roteiro','Roteiro']]],
+  ['estoque','Estoque',[['estoque','Estoque']]],
   ['pcp','PCP',[['pcpvaeso','Ordens de produção Vaeso']]],
   ['faturamento','Faturamento',[['faturamento','Faturamento'],['fpvenda','Formação de preço']]],
   ['contabilidade','Contabilidade',[['mc','MC'],['dre','DRE']]],
@@ -897,7 +900,7 @@ function route(){let t=ABAS.includes(location.hash.slice(1))?location.hash.slice
   if(t==='home'){const hr=new Date().getHours();$('olhoMod').textContent='Painel de controle';$('tituloMod').innerHTML=(hr<12?'Bom dia':hr<18?'Boa tarde':'Boa noite')+(S.perfil?', <span class="nome-red">'+esc(S.perfil)+'</span>':'');$('subMod').textContent='Acompanhe os principais indicadores e acesse rapidamente as áreas do sistema.';$('subMod').hidden=false;$('trilha').innerHTML='Sistema PKS<span class="sep">/</span><b>Home</b>'}
   else{$('olhoMod').textContent=m[1];$('tituloMod').textContent=nomeT;$('subMod').hidden=true;$('trilha').innerHTML='Sistema PKS<span class="sep">/</span>'+m[1]+(m[1]!==nomeT?'<span class="sep">/</span><b>'+nomeT+'</b>':'')}
   document.querySelector('.topo').classList.toggle('topo-home',t==='home');
-  const nb=$('countsBox');if(nb)nb.hidden=t!=='notas';document.querySelector('.topo').hidden=t==='nfe'||t==='pcpvaeso';const pp=$('perPanel');if(pp&&t!=='notas')pp.hidden=true;
+  const nb=$('countsBox');if(nb)nb.hidden=t!=='notas';document.querySelector('.topo').hidden=['nfe','pcpvaeso','estoque'].includes(t);const pp=$('perPanel');if(pp&&t!=='notas')pp.hidden=true;
   if(t==='config')renderConfig();
   if(window.MOD)window.MOD.mostrar(t)}
 const abaAtual=()=>ABAS.includes(location.hash.slice(1))?location.hash.slice(1):'home';

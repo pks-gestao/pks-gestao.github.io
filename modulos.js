@@ -746,6 +746,44 @@ function exportaCnf(){const R=M._cnfExport&&M._cnfExport();if(!R)return;
   baixaCsv('custo-nf-entrada.csv',String.fromCharCode(65279)+lin.join(String.fromCharCode(13,10)));
 }
 
+/* ---------- Estoque de produtos de venda (pedido do Chai, 25/11/2026) ---------- */
+/* Uma linha por produto e cliente, dos CFOPs de receita. Só a Vaeso tem saldo por enquanto:
+   entrada = apontamento de produção das ordens (vaeso_ops, total confirmado de cada item, no dia da confirmação);
+   saída = NF de receita emitida para a Vaeso e não cancelada. Os dois contam a partir do início do controle.
+   Saldo negativo = saiu na nota mais do que foi apontado. Os outros clientes ainda não têm entrada: saldo null. */
+const ESTOQUE_INICIO='2026-11-25';
+function estoquePks(linhas,ops,inicio,ehReceita,ehDaVaeso,dia){
+  const g=new Map(),cod=v=>String(v||'').trim().toUpperCase(),vaeso=linhas.find(l=>ehDaVaeso(l.destNome))?.destNome||'VAESO';
+  const linha=(c,cli,desc,un)=>{const k=c+'|'+cli;let o=g.get(k);if(!o){o={k,cod:c,desc,un,cli,vae:ehDaVaeso(cli),ent:0,sai:0,saldo:null,mov:[],ult:''};g.set(k,o)}return o};
+  for(const l of linhas){if(!ehReceita(l.cfop))continue;const c=cod(l.cod);if(!c)continue;const o=linha(c,l.destNome,l.desc,l.un);
+    if(l.data>=o.ult){o.ult=l.data;o.desc=l.desc||o.desc}
+    if(o.vae&&l.data>=inicio){o.sai+=+l.q||0;o.mov.push({data:l.data,tipo:'saida',doc:'NF '+(+l.nota||l.nota),q:+l.q||0})}}
+  for(const p of Object.values(ops||{}))for(const it of p.itens||[]){const c=cod(it.sku);if(!c)continue;const o=linha(c,vaeso,it.descricao||'','UN');
+    const q=+it.produzido?.qtd||0,em=it.produzido?.em;if(!q||!em)continue;const d=/^\d{4}-\d{2}-\d{2}$/.test(em)?em:dia(em);if(d<inicio)continue;
+    o.ent+=q;o.mov.push({data:d,tipo:'entrada',doc:(/^\d+$/.test(String(p.numero||''))?'OC '+p.numero:String(p.numero||'OC '+p.id))+(it.op_pks?' · OP '+it.op_pks:''),q})}
+  for(const o of g.values()){if(!o.vae)continue;o.saldo=Math.round((o.ent-o.sai)*1000)/1000;o.mov.sort((a,b)=>b.data.localeCompare(a.data)||a.tipo.localeCompare(b.tipo))}
+  return [...g.values()];
+}
+function renderEstoque(){
+  const box=$('v-estoque'),L=fatLinhas();
+  if(!L){box.innerHTML=esperando('Carregando o estoque…');carregar('faturamento').then(renderEstoque).catch(()=>box.innerHTML=esperando('Não foi possível carregar os produtos.'));return}
+  if(!M.vxPronto&&S.db){box.innerHTML=esperando('Carregando os apontamentos…');return}
+  const T=estoquePks(L,M.vxOps,ESTOQUE_INICIO,c=>tipoCfop(c).t==='Receita',ehVaeso,diaSP);
+  const clientes=[...new Set(T.map(r=>r.cli))].sort(COLL.compare),cli=ui('est_pcli','todos'),q=ui('b_estq',''),aberto=ui('estq_open',()=>new Set());
+  const R=T.filter(r=>(cli==='todos'||r.cli===cli)&&casa(`${r.cod} ${r.desc} ${r.cli}`,q)),soma=(rs,k)=>rs.reduce((a,r)=>a+(r[k]||0),0);
+  const ultNf=L.reduce((m,l)=>l.data>m?l.data:m,''),semV='<span class="muted">–</span>';
+  const cols=[{k:'cod',l:'Código',cls:()=>'mono',f:r=>`${r.mov.length?`<span class="seta">${aberto.has(r.k)?'▾':'›'}</span> `:'<span class="seta"></span> '}${esc(r.cod)}`},{k:'desc',l:'Descrição',cls:()=>'trunca',f:r=>`<span title="${esc(r.desc)}">${esc(r.desc)}</span>`},
+    {k:'cli',l:'Cliente',cls:()=>'trunca',f:r=>`<span title="${esc(r.cli)}">${esc(r.cli)}</span>`},{k:'un',l:'UM'},
+    {k:'ent',l:'Entradas',num:1,v:r=>r.vae?r.ent:null,f:r=>r.vae?num(r.ent,2):semV},{k:'sai',l:'Saídas',num:1,v:r=>r.vae?r.sai:null,f:r=>r.vae?num(r.sai,2):semV},
+    {k:'saldo',l:'Saldo estoque',num:1,f:r=>r.saldo===null?semV:`<b class="${r.saldo<0?'txt-stop':''}">${num(r.saldo,2)}</b>`}];
+  const det=r=>`<tr><td colspan="7" class="detail"><div class="inner"><table><thead><tr><th>Data</th><th>Movimento</th><th>Documento</th><th class="num">Quantidade</th></tr></thead><tbody>${r.mov.map(m=>`<tr><td>${dt(m.data)}</td><td>${m.tipo==='entrada'?'Entrada · apontamento':'Saída · nota fiscal'}</td><td>${esc(m.doc)}</td><td class="num">${m.tipo==='entrada'?'':'−'}${num(m.q,2)}</td></tr>`).join('')}</tbody></table></div></td></tr>`;
+  box.innerHTML=`<p class="vx-busca">Vaeso desde ${dt(ESTOQUE_INICIO)}: entradas pelo apontamento, saídas pelas notas emitidas até ${dt(ultNf)}.</p>
+  <div class="tools filtros">${selUI('est_pcli',[['todos','Todos os clientes'],...PRINCIPAIS.map(([k,l])=>[clientes.find(c=>c.includes(k))||k,'★ '+l]),...clientes.map(c=>[c,c])],'Cliente')}${buscaUI('estq','Código, descrição ou cliente')}</div>`+
+  tabela('estq',cols,R,{ordem:'saldo',desc:true,porPagina:50,cls:'compacto fit',vazio:'Nenhum produto com esse filtro.',
+    linha:r=>r.mov.length?` data-estq="${esc(r.k)}" class="row" tabindex="0" aria-expanded="${aberto.has(r.k)}"`:'',depois:r=>r.mov.length&&aberto.has(r.k)?det(r):'',
+    total:rs=>`<td colspan="4"><b>${rs.length.toLocaleString('pt-BR')} produto${rs.length===1?'':'s'}</b></td><td class="num"><b>${num(soma(rs,'ent'),2)}</b></td><td class="num"><b>${num(soma(rs,'sai'),2)}</b></td><td class="num"><b>${num(soma(rs,'saldo'),2)}</b></td>`});
+}
+
 /* ---------- PCP: ordens de produção Vaeso (integração com o Gestão Vaeso) ---------- */
 /* A Vaeso cria as ordens no Gestão Vaeso; a função pks-vaeso do Supabase copia para vaeso_ops a cada 10 min.
    A PKS confirma o produzido (Igual / Menos / Mais); a função grava em vaeso_prod e manda para a Vaeso.
@@ -1022,7 +1060,7 @@ function exportaMC(){const x=M._mcExport&&M._mcExport();if(!x)return;
   baixaCsv('margem-contribuicao-'+ui('fech_per','ano')+(ui('mc_cli','todos')!=='todos'?'-'+ui('mc_cli','todos').split(' ')[0].toLowerCase():'')+'.csv',String.fromCharCode(65279)+lin.join(String.fromCharCode(13,10)))}
 
 /* ---------- eventos ---------- */
-const RENDER={home:renderHome,fpvenda:renderFpVenda,pcpvaeso:renderPcpVaeso,custonf:renderCustoNf,formacao:renderFormacao,forn:renderForn,cfop:renderCfop,faturamento:renderFaturamento,clientes:renderClientes,produtos:renderProdutos,nfe:renderNfe,estrutura:renderEstrutura,roteiro:renderRoteiro,mc:renderMC,dre:renderDRE};
+const RENDER={home:renderHome,estoque:renderEstoque,fpvenda:renderFpVenda,pcpvaeso:renderPcpVaeso,custonf:renderCustoNf,formacao:renderFormacao,forn:renderForn,cfop:renderCfop,faturamento:renderFaturamento,clientes:renderClientes,produtos:renderProdutos,nfe:renderNfe,estrutura:renderEstrutura,roteiro:renderRoteiro,mc:renderMC,dre:renderDRE};
 M.atual=null;
 M.vxPainelAtivo=()=>document.activeElement?.id==='vxQtd';
 /* Só um item aberto por vez. */
@@ -1032,7 +1070,7 @@ function perMudou(){for(const k of Object.keys(M.ui))if(k.startsWith('tb_'))M.ui
 function rerender(){if(RENDER[M.atual]){const ae=document.activeElement,id=ae?.id,ss=ae?.selectionStart;RENDER[M.atual]();if(id){const n=document.getElementById(id);if(n&&n!==ae){n.focus();try{n.setSelectionRange(ss,ss)}catch{}}}}}
 document.addEventListener('click',e=>{
   const t=e.target;
-  const so=t.closest('button.sort[data-mt]');if(so){const st=ui('tb_'+so.dataset.mt,()=>({}));const k=so.dataset.mk;if(st.k===k)st.desc=!st.desc;else{st.k=k;st.desc=['q','total','preco','imp','nNotas','bruto','liq','mp','emb','inj','mc','mcp','custo','falta','valor','pecasHora','CAVIDADES','CICLO'].includes(k)}st.pag=0;rerender();document.querySelector(`button.sort[data-mt="${so.dataset.mt}"][data-mk="${k}"]`)?.focus();return}
+  const so=t.closest('button.sort[data-mt]');if(so){const st=ui('tb_'+so.dataset.mt,()=>({}));const k=so.dataset.mk;if(st.k===k)st.desc=!st.desc;else{st.k=k;st.desc=['q','total','preco','imp','nNotas','bruto','liq','mp','emb','inj','mc','mcp','custo','falta','saldo','ent','sai','valor','pecasHora','CAVIDADES','CICLO'].includes(k)}st.pag=0;rerender();document.querySelector(`button.sort[data-mt="${so.dataset.mt}"][data-mk="${k}"]`)?.focus();return}
   const pg=t.closest('[data-mp]');if(pg){const st=ui('tb_'+pg.dataset.mp,()=>({pag:0}));st.pag=Math.max(0,(st.pag||0)+(+pg.dataset.dir));rerender();return}
   const tf=t.closest('[data-trocaforn]');if(tf){ui('forn_edit',()=>new Set()).add(tf.dataset.trocaforn+'|'+tf.dataset.campo);rerender();return}
   const ic=t.closest('[data-ircfop]');if(ic){M._levar={b_cfop:ic.dataset.ircfop,cfop_lado:'123'.includes(String(ic.dataset.ircfop)[0])?'Entrada':'Saída'};location.hash='#cfop';return}
@@ -1058,6 +1096,7 @@ document.addEventListener('click',e=>{
   const fl=t.closest('[data-fpvlimpa]');if(fl){salvaFicha(fl.dataset.fpvlimpa,{precoSim:''},'Preço médio de volta.');return}
   const fm=t.closest('[data-fpvmodo]');if(fm){salvaFpv({modo:fm.dataset.fpvmodo});return}
   if(t.closest('input,select'))return;
+  const eq=t.closest('tr[data-estq]');if(eq){umaSo(ui('estq_open',()=>new Set()),eq.dataset.estq);rerender();return}
   const fn=t.closest('tr[data-fatnota]');if(fn){umaSo(ui('fatn_open',()=>new Set()),fn.dataset.fatnota);rerender();return}
   const fc=t.closest('[data-fatbar]');if(fc){const [de,ate,mes]=fc.dataset.fatbar.split('|');Object.assign(ui('per_fat',()=>({})),mes?{modo:'mes',de,ate}:{modo:'int',de,ate});M.ui.fat_vis='notas';perMudou();document.querySelector('#v-faturamento .seg[aria-label="Visão"]')?.scrollIntoView({block:'start',behavior:'smooth'});return}
   const no=t.closest('tr[data-nfopen]');if(no){const s=ui('nfa_open',()=>new Set());const k=no.dataset.nfopen;umaSo(s,k);rerender();return}
@@ -1074,7 +1113,7 @@ document.addEventListener('click',e=>{
   const fo=t.closest('[data-fpopen]');if(fo){const s=ui('fp_open',()=>new Set());const k=fo.dataset.fpopen;umaSo(s,k);rerender();return}
   const er=t.closest('tr[data-est]');if(er){const s=ui('est_open',()=>new Set());const k=er.dataset.est;umaSo(s,k);rerender();return}
 });
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&M.atual==='fpvenda'&&M.ui.fpv_q){fpvFecha();return}if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('tr[data-est],tr[data-nfopen],tr[data-fatnota],[data-fatbar],[data-vxord],[data-fpopen],[data-cnfopen],td[data-fpvq]')){e.preventDefault();e.target.click()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&M.atual==='fpvenda'&&M.ui.fpv_q){fpvFecha();return}if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('tr[data-est],tr[data-nfopen],tr[data-fatnota],tr[data-estq],[data-fatbar],[data-vxord],[data-fpopen],[data-cnfopen],td[data-fpvq]')){e.preventDefault();e.target.click()}});
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t.dataset.fpvpreco){const raw=t.value.trim();const v=raw===''?'':+raw.replace(/\./g,'').replace(',','.');if(raw!==''&&!(isFinite(v)&&v>0)){toast('Preço inválido. Use números, por exemplo 12,50.');return}salvaFicha(t.dataset.fpvpreco,{precoSim:v},v===''?'Preço médio de volta.':'Preço para simular salvo.');return}
@@ -1119,7 +1158,7 @@ document.addEventListener('input',e=>{const t=e.target;if(t.dataset?.mb){M.ui['b
   S.db.collection('formacao').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.form=o;if((M.atual==='formacao'||M.atual==='fpvenda')&&!document.activeElement?.dataset?.fpf&&!document.activeElement?.dataset?.fpmp&&!document.activeElement?.dataset?.fpvpreco&&!document.activeElement?.dataset?.fpvemb&&!document.activeElement?.dataset?.fpvinj)rerender()},()=>{});
   S.db.collection('classif').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.classif=o;if(!document.activeElement?.dataset?.cls)rerender()},()=>{});
   S.db.doc('config/categorias').onSnapshot(s=>{M.cats=s.exists?(s.data().lista||[]):[];if(['forn','nfe'].includes(M.atual))rerender()},()=>{});
-  S.db.collection('vaeso_ops').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxOps=o;M.vxPronto=true;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{M.vxPronto=true;if(M.atual==='pcpvaeso')rerender()});
+  S.db.collection('vaeso_ops').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxOps=o;M.vxPronto=true;if(M.atual==='estoque'||M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{M.vxPronto=true;if(['pcpvaeso','estoque'].includes(M.atual))rerender()});
   S.db.collection('vaeso_prod').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxProd=o;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
   S.db.collection('pcp_linhas').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxLin=o;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
   S.db.doc('meta/vaeso_sync').onSnapshot(s=>{M.vxMeta=s.exists?s.data():null;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
