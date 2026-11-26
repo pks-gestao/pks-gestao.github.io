@@ -1129,6 +1129,59 @@ function exportaMC(){const x=M._mcExport&&M._mcExport();if(!x)return;
   const lin=[x.cols.map(c=>c.l).join(';'),...x.R.map(r=>x.cols.map(c=>{const v=c.csv?c.csv(r):r[c.k];return typeof v==='number'?String(Math.round(v*100)/100).replace('.',','):'"'+String(v??'').replace(/"/g,'""')+'"'}).join(';'))];
   baixaCsv('margem-contribuicao-'+ui('fech_per','ano')+(ui('mc_cli','todos')!=='todos'?'-'+ui('mc_cli','todos').split(' ')[0].toLowerCase():'')+'.csv',String.fromCharCode(65279)+lin.join(String.fromCharCode(13,10)))}
 
+/* ---------- Polenta: novidades da aba aberta (pedido do Chai, 26/11/2026) ---------- */
+/* Quando chamado, o Polenta conta o que aconteceu por último na tela aberta, em tom animado. Cada novidade: {t (texto), mais (lista)}.
+   Só lê o que a tela já tem; o que ainda não carregou fica para a próxima vez que ele for chamado. */
+const quemFoi=id=>{const s=String(id||'');const n=(M.pessoas||{})[s.toLowerCase()]?.nome;if(n)return n.split(/\s+/)[0];const p=s.split('@')[0].split(/[._-]/)[0];return p?p[0].toUpperCase()+p.slice(1):'Alguém'};
+function quandoFoi(d,hoje){if(d===hoje)return 'hoje';const o=new Date(hoje+'T12:00:00Z');o.setUTCDate(o.getUTCDate()-1);if(d===o.toISOString().slice(0,10))return 'ontem';return 'em '+dt(d)}
+const plN=(n,a,b)=>n.toLocaleString('pt-BR')+' '+(n===1?a:b);
+function novApontamentos(hoje){
+  const L=[];for(const p of Object.values(M.vxOps||{}))for(const it of p.itens||[]){const x=it.produzido;if(!x?.em||!+x.qtd)continue;L.push({dia:diaSP(x.em),por:x.por||'',sku:it.sku||'',desc:it.descricao||'',q:+x.qtd,oc:vxNumero(p)})}
+  if(!L.length)return [];const dia=L.reduce((m,x)=>x.dia>m?x.dia:m,''),D=L.filter(x=>x.dia===dia),g=new Map();
+  for(const x of D){const k=x.por||'?';(g.get(k)||g.set(k,[]).get(k)).push(x)}
+  return [...g.entries()].sort((a,b)=>b[1].length-a[1].length).map(([por,l])=>({t:`Sabia que ${por==='?'?'alguém':quemFoi(por)} apontou ${plN(l.length,'produto','produtos')} ${quandoFoi(dia,hoje)}? Foram ${n0(l.reduce((a,x)=>a+x.q,0))} peças!`,
+    pergunta:'Quer saber quais são?',mais:l.map(x=>`${x.sku} · ${x.desc} · ${n0(x.q)} pç (${x.oc})`)}));
+}
+function novPcp(hoje){
+  const out=novApontamentos(hoje),O=vxOrdens().filter(o=>o.status==='aberta'),at=O.filter(o=>o.prevista&&o.prevista<hoje);
+  if(at.length)out.push({t:`Olha só: ${plN(at.length,'ordem está atrasada','ordens estão atrasadas')} na Vaeso. Bora dar um gás?`,pergunta:'Quer ver quais?',mais:at.map(o=>`${o.numero} · prevista ${dt(o.prevista)} · ${n0(o.feito)} de ${n0(o.ped)} pç`)});
+  const prox=O.filter(o=>o.prevista&&o.prevista>=hoje).sort((a,b)=>a.prevista.localeCompare(b.prevista))[0];
+  if(prox)out.push({t:`A próxima entrega é a ${prox.numero}, prevista para ${quandoFoi(prox.prevista,hoje).replace(/^em /,'')}. Já tem ${Math.round(prox.pct)}% produzido!`});
+  if(M.movPronto&&M.prtPronto){const p=apontamentosPks(M.vxOps,M.estMov,diaSP).filter(a=>!(M.prtApont||{})[a.id]);
+    if(p.length)out.push({t:`Psiu! Tem ${plN(p.length,'apontamento esperando','apontamentos esperando')} para lançar no Protheus.`,pergunta:'Quer ver a lista?',mais:p.slice(0,12).map(a=>`${a.op||'sem OP'} · ${a.sku} · ${n0(a.q)} pç`)})}
+  return out;
+}
+function novFaturamento(hoje){
+  const L=fatLinhas();if(!L){carregar('faturamento').then(()=>{if(typeof renderPolenta==='function')renderPolenta()}).catch(()=>{});return []}
+  const R=L.filter(l=>tipoCfop(l.cfop).t==='Receita');if(!R.length)return [];
+  const dia=R.reduce((m,l)=>l.data>m?l.data:m,''),D=R.filter(l=>l.data===dia),g=new Map();
+  for(const l of D){const o=g.get(l.chave)||{n:+l.nota||l.nota,c:l.destNome,v:0};o.v+=l.total;g.set(l.chave,o)}
+  const N=[...g.values()].sort((a,b)=>b.v-a.v),tot=N.reduce((a,n)=>a+n.v,0),mes=dia.slice(0,7),fm=R.filter(l=>l.data.startsWith(mes)).reduce((a,l)=>a+l.total,0);
+  return [{t:`${N.length===1?'Saiu':'Saíram'} ${plN(N.length,'nota','notas')} ${quandoFoi(dia,hoje)}, somando ${brl0(tot)}! A maior foi para ${nomeCurtoCli(N[0].c)}.`,pergunta:'Quer saber quais foram?',mais:N.map(n=>`NF ${n.n} · ${nomeCurtoCli(n.c)} · ${brl0(n.v)}`)},
+    {t:`No mês, o faturamento já está em ${brl0(fm)}. Vamos que vamos!`}];
+}
+const nomeCurtoCli=s=>String(s||'').split(/\s+/).slice(0,2).join(' ');
+function novEstoque(hoje){
+  if(!fatLinhas()||!M.vxPronto||!M.movPronto)return [];
+  const T=estoquePks(fatLinhas(),M.vxOps,M.estMov,ESTOQUE_ZERO,c=>tipoCfop(c).t==='Receita',ehVaeso,diaSP),V=T.flatMap(r=>r.mov),out=[];
+  if(V.length){const dia=V.reduce((m,x)=>x.data>m?x.data:m,''),D=V.filter(x=>x.data===dia),e=D.filter(x=>x.q>0),s=D.filter(x=>x.q<0);
+    out.push({t:`${quandoFoi(dia,hoje)[0].toUpperCase()+quandoFoi(dia,hoje).slice(1)} o estoque da Vaeso teve ${plN(e.length,'entrada','entradas')} e ${plN(s.length,'saída','saídas')}!`,pergunta:'Quer ver as movimentações?',mais:D.map(x=>`${x.q>0?'+':'−'}${n0(Math.abs(x.q))} ${x.cod} · ${x.doc}`)})}
+  const neg=T.filter(r=>r.saldo<0);if(neg.length)out.push({t:`Atenção: ${plN(neg.length,'produto está','produtos estão')} com saldo negativo. Saiu na nota mais do que foi apontado.`,pergunta:'Quer saber quais?',mais:neg.map(r=>`${r.cod} · ${n0(r.saldo)}`)});
+  const pos=T.filter(r=>r.saldo>0);if(pos.length)out.push({t:`Tem ${plN(pos.length,'produto','produtos')} com saldo na PKS esperando a nota para a Vaeso.`,pergunta:'Quer ver quais?',mais:pos.sort((a,b)=>b.saldo-a.saldo).map(r=>`${r.cod} · ${n0(r.saldo)} pç`)});
+  return out;
+}
+function novCusto(hoje){
+  const E=M.dados.entradas;if(!E){carregar('entradas').then(()=>{if(typeof renderPolenta==='function')renderPolenta()}).catch(()=>{});return []}
+  const it=comprasItens();if(!it.length)return [];const dia=it.reduce((m,x)=>x.data>m?x.data:m,''),D=it.filter(x=>x.data===dia);
+  return [{t:`${new Set(D.map(x=>x.doc+'|'+x.forn)).size===1?'Chegou':'Chegaram'} ${plN(new Set(D.map(x=>x.doc+'|'+x.forn)).size,'nota de compra','notas de compra')} ${quandoFoi(dia,hoje)}, com ${plN(new Set(D.map(x=>x.key)).size,'material','materiais')}!`,pergunta:'Quer saber quais?',mais:D.map(x=>`${x.desc} · ${nomeCurtoCli(x.forn)} · R$ ${brl(x.custo)}/${String(x.un||'un').toLowerCase()}`)}];
+}
+M.novidades=tab=>{
+  const hoje=diaSP(Date.now()),f={pcpvaeso:novPcp,estoque:novEstoque,estmov:novEstoque,faturamento:novFaturamento,fpvenda:novFaturamento,custonf:novCusto,nfe:novCusto}[tab];
+  try{if(f)return f(hoje);if(tab==='home')return [...novApontamentos(hoje).slice(0,1),...novFaturamento(hoje).slice(0,1),...novEstoque(hoje).slice(0,1)]}catch(e){console.error(e)}
+  return [];
+};
+M.carregarPessoas=db=>db.collection('pessoas').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id.toLowerCase()]=d.data());M.pessoas=o},()=>{});
+
 /* ---------- eventos ---------- */
 const RENDER={home:renderHome,estoque:renderEstoque,estmov:renderEstMov,fpvenda:renderFpVenda,pcpvaeso:renderPcpVaeso,custonf:renderCustoNf,formacao:renderFormacao,forn:renderForn,cfop:renderCfop,faturamento:renderFaturamento,clientes:renderClientes,produtos:renderProdutos,nfe:renderNfe,estrutura:renderEstrutura,roteiro:renderRoteiro,mc:renderMC,dre:renderDRE};
 M.atual=null;
@@ -1233,6 +1286,7 @@ document.addEventListener('input',e=>{const t=e.target;if(t.dataset?.mb){M.ui['b
   S.db.collection('vaeso_ops').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxOps=o;M.vxPronto=true;if(['estoque','estmov'].includes(M.atual)||M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{M.vxPronto=true;if(['pcpvaeso','estoque','estmov'].includes(M.atual))rerender()});
   S.db.collection('vaeso_prod').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxProd=o;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
   S.db.collection('estoque_mov').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.estMov=o;M.movPronto=true;if(['estoque','estmov','pcpvaeso'].includes(M.atual))rerender()},()=>{M.movPronto=true;if(['estoque','estmov','pcpvaeso'].includes(M.atual))rerender()});
+  M.carregarPessoas(S.db);
   S.db.collection('protheus_apont').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.prtApont=o;M.prtPronto=true;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{M.prtPronto=true;if(M.atual==='pcpvaeso')rerender()});
   S.db.collection('pcp_linhas').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxLin=o;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
   S.db.doc('meta/vaeso_sync').onSnapshot(s=>{M.vxMeta=s.exists?s.data():null;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
