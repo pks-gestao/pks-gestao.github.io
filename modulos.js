@@ -755,17 +755,17 @@ const ESTOQUE_ZERO={em:'2026-11-25T18:29:55Z',dia:'2026-11-25',nota:28230};
 /* Entradas de um item de ordem. Cada apontamento grava em estoque_mov a diferença (delta) do total; o que mudou sem registro
    (apontamento que a Vaeso recebeu depois, registro que falhou) entra como a diferença que falta, no dia da última confirmação. */
 function entradasDoItem(total,em,logs,depoisDoZero,dia){
-  const out=[],diaDe=v=>/^\d{4}-\d{2}-\d{2}$/.test(v)?v:dia(v),poe=(q,v)=>{if(q&&v&&depoisDoZero(v))out.push({data:diaDe(v),em:v,q})};
-  if(!logs.length){poe(total,em);return out}
-  const L=[...logs].sort((a,b)=>String(a.em).localeCompare(String(b.em)));let soma=+L[0].antes||0;poe(soma,L[0].antesEm);
-  for(const l of L){const ant=+l.antes||0;if(ant!==soma){poe(ant-soma,l.em);soma=ant}poe(+l.delta||0,l.em);soma+=+l.delta||0}
-  if(total!==soma)poe(total-soma,em||L[L.length-1].em);
+  const out=[],diaDe=v=>/^\d{4}-\d{2}-\d{2}$/.test(v)?v:dia(v),poe=(q,v,id)=>{if(q&&v&&depoisDoZero(v))out.push({id,data:diaDe(v),em:v,q})};
+  if(!logs.length){poe(total,em,'u|'+em);return out}
+  const L=[...logs].sort((a,b)=>String(a.em).localeCompare(String(b.em)));let soma=+L[0].antes||0;poe(soma,L[0].antesEm,'u|'+L[0].antesEm);
+  for(const l of L){const ant=+l.antes||0;if(ant!==soma){poe(ant-soma,l.em,'a|'+l._id);soma=ant}poe(+l.delta||0,l.em,'m|'+l._id);soma+=+l.delta||0}
+  if(total!==soma)poe(total-soma,em||L[L.length-1].em,'f|'+(em||L[L.length-1].em));
   return out;
 }
 function estoquePks(linhas,ops,logs,zero,ehReceita,ehDaVaeso,dia){
   const g=new Map(),cod=v=>String(v||'').trim().toUpperCase(),vaeso=linhas.find(l=>ehDaVaeso(l.destNome))?.destNome||'VAESO';
   const depois=v=>/^\d{4}-\d{2}-\d{2}$/.test(v)?v>zero.dia:Date.parse(v)>Date.parse(zero.em),porItem={};
-  for(const l of Object.values(logs||{})){const k=l.op_id+'|'+l.produto_id;(porItem[k]=porItem[k]||[]).push(l)}
+  for(const [id,l] of Object.entries(logs||{})){const k=l.op_id+'|'+l.produto_id;(porItem[k]=porItem[k]||[]).push({...l,_id:id})}
   const linha=(c,cli,desc,un)=>{const k=c+'|'+cli;let o=g.get(k);if(!o){o={k,cod:c,desc,un,cli,vae:ehDaVaeso(cli),ent:0,sai:0,saldo:null,mov:[],ult:''};g.set(k,o)}return o};
   for(const l of linhas){if(!ehReceita(l.cfop))continue;const c=cod(l.cod);if(!c)continue;const o=linha(c,l.destNome,l.desc,l.un);
     if(l.data>=o.ult){o.ult=l.data;o.desc=l.desc||o.desc}
@@ -853,16 +853,50 @@ function quadroProduzidos(){
   <div class="vx-pz-d">${r.dias.map(d=>`<div class="${d===hoje?'hoje':''}"><span>${rot(d)}</span><b>${n0(r.porDia[d])}</b></div>`).join('')}</div>
   ${!r.linhas.length?'<p class="small muted">Nenhuma produção apontada nos últimos 7 dias.</p>':ab?`<div class="scroll"><table class="compacto fit"><thead><tr><th>Produto</th>${r.dias.map(d=>`<th class="num">${diaCurto(d)}</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>${r.linhas.map(l=>`<tr><td><span class="mono muted">${esc(l.sku)}</span> ${esc(l.desc)}</td>${r.dias.map(d=>`<td class="num">${l.dias[d]?n0(l.dias[d]):'<span class="muted">–</span>'}</td>`).join('')}<td class="num"><b>${n0(l.total)}</b></td></tr>`).join('')}<tr class="tot"><td><b>Total · ${r.linhas.length} produto${r.linhas.length===1?'':'s'}</b></td>${r.dias.map(d=>`<td class="num"><b>${n0(r.porDia[d])}</b></td>`).join('')}<td class="num"><b>${n0(r.total)}</b></td></tr></tbody></table></div>`:''}</section>`;
 }
+/* PCP › Protheus (pedido do Chai, 26/11/2026): os apontamentos feitos aqui, um por linha e por data, para outra pessoa lançar no
+   Protheus. Marcar "Apontado" grava em protheus_apont/<id do apontamento> e a linha sai dos pendentes. Só no site: sem Vaeso e sem painel. */
+function apontamentosPks(ops,logs,dia){
+  const porItem={},out=[];
+  for(const [id,l] of Object.entries(logs||{})){const k=l.op_id+'|'+l.produto_id;(porItem[k]=porItem[k]||[]).push({...l,_id:id})}
+  for(const p of Object.values(ops||{}))for(const it of p.itens||[]){const k=p.id+'|'+it.produto_id;
+    for(const e of entradasDoItem(+it.produzido?.qtd||0,it.produzido?.em||'',porItem[k]||[],()=>true,dia))
+      out.push({id:k+'|'+e.id,data:e.data,em:e.em,q:e.q,oc:vxNumero(p),op:it.op_pks||'',sku:it.sku||'',desc:it.descricao||'',total:+it.qtd||0})}
+  return out;
+}
+function renderProtheus(box,topo){
+  if(!M.movPronto||!M.prtPronto){box.innerHTML=topo+esperando('Carregando os apontamentos…');return}
+  const A=apontamentosPks(M.vxOps,M.estMov,diaSP),feito=M.prtApont||{},f=ui('prt_f','pendentes'),q=ui('b_prt','');
+  const pend=A.filter(a=>!feito[a.id]),fim=A.filter(a=>feito[a.id]);
+  const R=(f==='pendentes'?pend:fim).filter(a=>casa(`${a.op} ${a.sku} ${a.desc} ${a.oc}`,q));
+  const cols=[{k:'data',l:'Data',v:a=>a.em,f:a=>dt(a.data)},{k:'op',l:'OP PKS',cls:()=>'mono',f:a=>a.op?esc(a.op):'<span class="muted">sem OP</span>'},{k:'sku',l:'Código',cls:()=>'mono'},
+    {k:'desc',l:'Descrição',cls:()=>'trunca',f:a=>`<span title="${esc(a.desc)}">${esc(a.desc)}</span><small class="muted vx-quem">${esc(a.oc)}</small>`},{k:'total',l:'Total OP',num:1,f:a=>num(a.total,2)},
+    {k:'q',l:'Produção apontada',num:1,f:a=>`<b class="${a.q<0?'txt-stop':''}">${a.q<0?'−'+num(-a.q,2)+' <small>(estorno)</small>':num(a.q,2)}</b>`},
+    f==='pendentes'?{k:'_ap',l:'Apontar no Protheus',v:()=>0,f:a=>`<button type="button" class="bt vx-bt" data-prt="${esc(a.id)}" ${M.prtOcup?'disabled':''}>Apontado</button>`}
+      :{k:'_ap',l:'Apontado no Protheus',v:a=>feito[a.id]?.em||'',f:a=>`<span class="pill p-done">Produzido</span><small class="muted vx-quem">${dt(String(feito[a.id]?.em||'').slice(0,10))}${feito[a.id]?.por?' · '+esc(feito[a.id].por):''}</small> <button type="button" class="lnk" data-prtvolta="${esc(a.id)}">voltar</button>`}];
+  box.innerHTML=topo+`<nav class="nfa-tabs vx-abas" aria-label="Situação no Protheus">${[['pendentes','Pendentes',pend.length],['apontados','Apontados',fim.length]].map(([k,l,n])=>`<button data-uiset="prt_f" data-v="${k}" aria-pressed="${f===k}">${l} <span class="small">${n}</span></button>`).join('')}</nav>
+  <div class="tools filtros">${buscaUI('prt','OP, código, descrição ou OC')}</div>`+
+  tabela('prt_'+f,cols,R,{ordem:'data',desc:f!=='pendentes',porPagina:50,cls:'compacto fit',vazio:f==='pendentes'?'Nenhum apontamento pendente no Protheus.':'Nenhum apontamento marcado ainda.'});
+}
+async function marcaProtheus(id,on){
+  if(!S.db){toast('Sem conexão com a base. Nada foi gravado.');return}
+  M.prtOcup=true;rerender();
+  try{if(on)await S.db.doc('protheus_apont/'+id).set({em:new Date().toISOString(),por:S.perfil||''});else await S.db.doc('protheus_apont/'+id).delete();
+    const s=await S.db.collection('protheus_apont').get();const o={};s.docs.forEach(d=>o[d.id]=d.data());M.prtApont=o;toast(on?'Marcado como apontado no Protheus.':'Voltou para pendentes.')}
+  catch{toast('Não foi possível gravar. Tente de novo.')}
+  M.prtOcup=false;rerender();
+}
 function renderPcpVaeso(){
   const box=$('v-pcpvaeso');
   if(!M.vxPronto){box.innerHTML=esperando('Carregando as ordens de produção da Vaeso…');return}
+  const tela=ui('vx_tela','ordens'),navTela=`<nav class="nfa-tabs vx-telas" aria-label="Telas do PCP">${[['ordens','Ordens'],['protheus','Protheus']].map(([k,l])=>`<button data-uiset="vx_tela" data-v="${k}" aria-pressed="${tela===k}">${l}</button>`).join('')}</nav>`;
+  if(tela==='protheus'){renderProtheus(box,navTela);return}
   const O=vxOrdens(),q=ui('b_vx',''),aba=ui('vx_aba','abertas'),aberto=ui('vx_open',()=>new Set()),ordAb=ui('vx_ord',()=>new Set()),site=!!window.pksFuncao;
   const abertas=O.filter(o=>o.status==='aberta'),fin=O.filter(o=>o.status!=='aberta');
   const casaO=o=>casa(`${o.numero} ${o.obs} ${o.itens.map(r=>r.sku+' '+r.desc+' '+r.opPks).join(' ')}`,q);
   const lista=(aba==='abertas'?abertas:fin).filter(casaO),meta=M.vxMeta||{},itAb=abertas.flatMap(o=>o.itens);
   const kpi=(t,v,s)=>`<div class="card-k"><span>${t}</span><b>${v}</b>${s?`<small class="muted">${s}</small>`:''}</div>`;
   const quando=meta.ultimoPuxar||meta.em?new Date(meta.ultimoPuxar||meta.em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'–';
-  let h=`<p class="vx-busca">Última busca na Vaeso: ${quando} · a cada 10 minutos${meta.erro?` · <span class="txt-stop">Erro: ${esc(meta.erro)}</span>`:''}</p>${quadroProduzidos()}<div class="cards3">${kpi('Ordens em aberto',n0(abertas.length),n0(itAb.length)+' itens')}${kpi('Itens sem confirmação',n0(itAb.filter(r=>!r.prod).length),'produção ainda não informada')}${kpi('Peças pedidas em aberto',n0(itAb.reduce((a,r)=>a+r.qtd,0)),'')}</div>
+  let h=navTela+`<p class="vx-busca">Última busca na Vaeso: ${quando} · a cada 10 minutos${meta.erro?` · <span class="txt-stop">Erro: ${esc(meta.erro)}</span>`:''}</p>${quadroProduzidos()}<div class="cards3">${kpi('Ordens em aberto',n0(abertas.length),n0(itAb.length)+' itens')}${kpi('Itens sem confirmação',n0(itAb.filter(r=>!r.prod).length),'produção ainda não informada')}${kpi('Peças pedidas em aberto',n0(itAb.reduce((a,r)=>a+r.qtd,0)),'')}</div>
   <nav class="nfa-tabs vx-abas" aria-label="Situação das ordens">${[['abertas','Em aberto',abertas.length],['finalizadas','Finalizadas',fin.length]].map(([k,l,n])=>`<button data-uiset="vx_aba" data-v="${k}" aria-pressed="${aba===k}">${l} <span class="small">${n}</span></button>`).join('')}</nav>
   <div class="tools filtros">${buscaUI('vx','OC, OP da PKS, SKU ou descrição')}</div>`;
   if(!site)h+=`<p class="small muted">A confirmação do produzido é feita no site do PKS (pks-gestao.github.io). Aqui a lista é só para consulta.</p>`;
@@ -1137,6 +1171,8 @@ document.addEventListener('click',e=>{
   const fc=t.closest('[data-fatbar]');if(fc){const [de,ate,mes]=fc.dataset.fatbar.split('|');Object.assign(ui('per_fat',()=>({})),mes?{modo:'mes',de,ate}:{modo:'int',de,ate});M.ui.fat_vis='notas';perMudou();document.querySelector('#v-faturamento .seg[aria-label="Visão"]')?.scrollIntoView({block:'start',behavior:'smooth'});return}
   const no=t.closest('tr[data-nfopen]');if(no){const s=ui('nfa_open',()=>new Set());const k=no.dataset.nfopen;umaSo(s,k);rerender();return}
   const ve=t.closest('[data-vxenc]');if(ve){vxEncerrar(ve.dataset.vxenc);return}
+  const pr=t.closest('[data-prt]');if(pr){marcaProtheus(pr.dataset.prt,true);return}
+  const pv=t.closest('[data-prtvolta]');if(pv){marcaProtheus(pv.dataset.prtvolta,false);return}
   const vr=t.closest('[data-vxord]');if(vr){umaSo(ui('vx_ord',()=>new Set()),vr.dataset.vxord);ui('vx_open',()=>new Set()).clear();M.ui.vx_modo='';M.vxErro='';M.vxVal='';rerender();document.querySelector(`[data-vxord="${CSS.escape(vr.dataset.vxord)}"]`)?.focus();return}
   const vo=t.closest('[data-vxopen]');if(vo){umaSo(ui('vx_open',()=>new Set()),vo.dataset.vxopen);M.ui.vx_modo='';M.vxErro='';M.vxVal='';rerender();return}
   const vm=t.closest('[data-vxmodo]');if(vm){M.ui.vx_modo=vm.dataset.vxmodo;M.vxErro='';M.vxFoco=true;rerender();return}
@@ -1196,7 +1232,8 @@ document.addEventListener('input',e=>{const t=e.target;if(t.dataset?.mb){M.ui['b
   S.db.doc('config/categorias').onSnapshot(s=>{M.cats=s.exists?(s.data().lista||[]):[];if(['forn','nfe'].includes(M.atual))rerender()},()=>{});
   S.db.collection('vaeso_ops').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxOps=o;M.vxPronto=true;if(['estoque','estmov'].includes(M.atual)||M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{M.vxPronto=true;if(['pcpvaeso','estoque','estmov'].includes(M.atual))rerender()});
   S.db.collection('vaeso_prod').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxProd=o;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
-  S.db.collection('estoque_mov').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.estMov=o;M.movPronto=true;if(['estoque','estmov'].includes(M.atual))rerender()},()=>{M.movPronto=true;if(['estoque','estmov'].includes(M.atual))rerender()});
+  S.db.collection('estoque_mov').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.estMov=o;M.movPronto=true;if(['estoque','estmov','pcpvaeso'].includes(M.atual))rerender()},()=>{M.movPronto=true;if(['estoque','estmov','pcpvaeso'].includes(M.atual))rerender()});
+  S.db.collection('protheus_apont').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.prtApont=o;M.prtPronto=true;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{M.prtPronto=true;if(M.atual==='pcpvaeso')rerender()});
   S.db.collection('pcp_linhas').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());M.vxLin=o;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
   S.db.doc('meta/vaeso_sync').onSnapshot(s=>{M.vxMeta=s.exists?s.data():null;if(M.atual==='pcpvaeso'&&!M.vxPainelAtivo())rerender()},()=>{});
   S.db.doc('config/contabilidade').onSnapshot(s=>{M.config=s.exists?s.data():{};if(['mc','dre','fpvenda'].includes(M.atual)&&!(document.activeElement?.dataset?.cfg))rerender()},()=>{});
