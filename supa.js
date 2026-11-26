@@ -4,6 +4,8 @@
 (function(){
   const C=window.PKS_CONFIG||{};
   /* Tudo do PKS fica no esquema pks do projeto, separado do que já existe nele. */
+  /* Link do convite ou do "Esqueci a senha" (26/11/2026): chega com #...type=invite|recovery; depois de entrar, pede a senha */
+  const tipoLink=(/[#&]type=(invite|recovery)/.exec(location.hash)||[])[1]||'';
   const sb=window.supabase.createClient(C.url,C.anonKey,{db:{schema:'pks'}});
   let sessao=null,perfil=null;
 
@@ -35,12 +37,23 @@
         msg.textContent=error?'Não foi possível criar o acesso.':'Enviamos um link para o seu e-mail. Confirme e depois entre.'}
       if(a==='esqueci'){await sb.auth.resetPasswordForEmail(d.email,{redirectTo:location.origin+location.pathname});msg.textContent='Se o e-mail estiver cadastrado, enviamos o link para trocar a senha.'}});
   })}
-  async function novaSenha(){const s=prompt('Digite a nova senha (mínimo 8 caracteres):');if(s&&s.length>=8){await sb.auth.updateUser({password:s});alert('Senha alterada.')}}
-  sb.auth.onAuthStateChange((ev)=>{if(ev==='PASSWORD_RECOVERY')novaSenha()});
+  function telaSenha(nome,convite){return new Promise(ok=>{
+    const st=document.createElement('style');st.textContent=estilo;document.head.appendChild(st);
+    const w=document.createElement('div');w.id='pksLogin';
+    w.innerHTML=`<form><h1>${convite?'Bem-vindo'+(nome?', '+nome.replace(/[<>&"]/g,''):'')+'!':'Nova senha'}</h1><p style="margin:0;font-size:14px;color:#6e6d6a">${convite?'Crie a senha que você vai usar para entrar no Sistema PKS.':'Digite a nova senha do Sistema PKS.'}</p>
+      <label>Senha<input type="password" name="s" required minlength="8" autocomplete="new-password"></label><label>Repita a senha<input type="password" name="r" required minlength="8" autocomplete="new-password"></label>
+      <button type="submit">${convite?'Criar senha e entrar':'Salvar senha'}</button><div class="msg" role="status"></div></form>`;
+    document.body.appendChild(w);const f=w.querySelector('form'),msg=w.querySelector('.msg');f.s.focus();
+    f.addEventListener('submit',async e=>{e.preventDefault();
+      if(f.s.value.length<8){msg.textContent='Use pelo menos 8 caracteres.';return}if(f.s.value!==f.r.value){msg.textContent='As duas senhas não são iguais.';return}
+      msg.textContent='Salvando…';const {error}=await sb.auth.updateUser({password:f.s.value});
+      if(error){msg.textContent=/different|same/i.test(error.message)?'Escolha uma senha diferente da anterior.':'Não foi possível salvar. Peça um novo link ao administrador.';return}
+      w.remove();ok()})})}
 
   const pronto=(async()=>{
     if(document.readyState==='loading')await new Promise(r=>document.addEventListener('DOMContentLoaded',r,{once:true}));
     const {data}=await sb.auth.getSession();sessao=data.session||await telaLogin();
+    if(tipoLink&&data.session){history.replaceState(null,'',location.pathname+location.search);await telaSenha(sessao.user.user_metadata?.nome||'',tipoLink==='invite')}
     const email=sessao.user.email.toLowerCase();
     const r=await sb.from('usuarios').select('*').eq('email',email).maybeSingle();perfil=r.data||null;
     botaoSair();return {email,perfil};

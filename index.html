@@ -644,6 +644,7 @@ td.fpv-semc{color:var(--muted);font-size:11.5px}
 .cfg-abas{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
 .cfg-abas fieldset{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:0;display:grid;gap:4px}
 .cfg-abas legend{font:600 11px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 4px}
+.cfg-telas{width:max-content;margin-bottom:12px}.cfg-linha{display:flex;flex-wrap:wrap;align-items:end;gap:10px}.cfg-tab td{vertical-align:middle}.cfg-in{font:13px var(--body);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);min-width:150px}.cfg-acoes{white-space:nowrap;text-align:right}.cfg-acoes .bt{padding:6px 10px;font-size:12.5px;margin-left:6px}
 .cfg-abas label{font-size:13px;display:flex;gap:6px;align-items:center}.cfg-abas input{accent-color:var(--firebrick)}
 /* ===== Layout 2026: lateral grafite e vermelho PKS, tema claro e escuro à escolha do usuário ===== */
 :root,:root[data-theme="light"]{--red:#d71f26;--red-ink:#c11a21;--red-bg:#fdecec;--brand:#d71f26;
@@ -899,7 +900,7 @@ function route(){let t=ABAS.includes(location.hash.slice(1))?location.hash.slice
   for(const k of ABAS)$('v-'+k).hidden=k!==t;
   S.modAberto=modDe(t)[0];S.subAberto=false;desenhaMenu(t);
   const m=modDe(t),nomeT=m[2].find(a=>a[0]===t)[1];
-  if(t==='home'){const hr=new Date().getHours();$('olhoMod').textContent='Painel de controle';$('tituloMod').innerHTML=(hr<12?'Bom dia':hr<18?'Boa tarde':'Boa noite')+(S.perfil?', <span class="nome-red">'+esc(S.perfil)+'</span>':'');$('subMod').textContent='Acompanhe os principais indicadores e acesse rapidamente as áreas do sistema.';$('subMod').hidden=false;$('trilha').innerHTML='Sistema PKS<span class="sep">/</span><b>Home</b>'}
+  if(t==='home'){const hr=new Date().getHours();$('olhoMod').textContent='Painel de controle';$('tituloMod').innerHTML=(hr<12?'Bom dia':hr<18?'Boa tarde':'Boa noite')+(S.nome||S.perfil?', <span class="nome-red">'+esc(S.nome||S.perfil)+'</span>':'');$('subMod').textContent='Acompanhe os principais indicadores e acesse rapidamente as áreas do sistema.';$('subMod').hidden=false;$('trilha').innerHTML='Sistema PKS<span class="sep">/</span><b>Home</b>'}
   else{$('olhoMod').textContent=m[1];$('tituloMod').textContent=nomeT;$('subMod').hidden=true;$('trilha').innerHTML='Sistema PKS<span class="sep">/</span>'+m[1]+(m[1]!==nomeT?'<span class="sep">/</span><b>'+nomeT+'</b>':'')}
   document.querySelector('.topo').classList.toggle('topo-home',t==='home');
   const nb=$('countsBox');if(nb)nb.hidden=t!=='notas';document.querySelector('.topo').hidden=['nfe','pcpvaeso','estoque'].includes(t);const pp=$('perPanel');if(pp&&t!=='notas')pp.hidden=true;
@@ -943,37 +944,83 @@ async function iniciaAcesso(){
   let me=null;try{me=u?await u.me():null}catch{}
   const adm=!!(me&&(me.isOwner||me.canEdit));
   const db=await (window.claude?.use?window.claude.use('db'):Promise.resolve(null)).catch(()=>null);
+  if(me?.id&&db)db.doc('pessoas/'+me.id).get().then(sn=>{S.nome=sn.exists?sn.data()?.nome||'':'';perfilUI();if(abaAtual()==='home')route()}).catch(()=>{});
   if(adm){S.acesso={pronto:true,adm:true,reg:null};S.perfil='Administrador';
-    if(db)db.collection('usuarios').onSnapshot(sn=>{S.usuarios=sn.docs.map(d=>({id:d.id,...d.data()}));if(abaAtual()==='config')renderConfig()},()=>{});}
+    if(db){db.collection('usuarios').onSnapshot(sn=>{S.usuarios=sn.docs.map(d=>({id:d.id,...d.data()}));if(abaAtual()==='config')renderConfig()},()=>{});
+      db.doc('config/setores').onSnapshot(sn=>{const l=sn.exists?sn.data()?.lista:null;S.setores=Array.isArray(l)?l:null;if(abaAtual()==='config')renderConfig()},()=>{});
+      db.collection('pessoas').onSnapshot(sn=>{const o={};sn.docs.forEach(d=>o[d.id]=d.data());S.nomes=o;if(abaAtual()==='config'&&!document.activeElement?.dataset?.unome)renderConfig()},()=>{});}}
   else if(me&&me.id&&db){db.doc('usuarios/'+me.id).onSnapshot(sn=>{const reg=sn.exists?sn.data():null;S.acesso={pronto:true,adm:false,reg};S.perfil=reg?.setor||'Sem acesso';perfilUI();route()},()=>{S.acesso={pronto:true,adm:false,reg:null};route()});}
   else{S.acesso={pronto:true,adm:false,reg:null};S.perfil='Sem acesso'}
   perfilUI();route()}
-function perfilUI(){if(!S.perfil)return;$('perfilNome').textContent=S.perfil;$('perfilIni').textContent=S.perfil.replace(/[^A-Za-zÀ-ú]/g,'').slice(0,2).toUpperCase()}
-/* Configurações › Usuários */
+function perfilUI(){if(!S.perfil)return;const n=S.nome||S.perfil;$('perfilNome').textContent=n;$('perfilNome').nextElementSibling.textContent=S.nome?S.perfil:'Perfil de acesso';$('perfilIni').textContent=n.replace(/[^A-Za-zÀ-ú]/g,'').slice(0,2).toUpperCase()}
+/* Configurações (pedido do Chai, 26/11/2026): Setores (o que cada setor acessa) e Usuários (nome, e-mail e setor).
+   O acesso de cada pessoa continua gravado em usuarios/<id>.abas (é o que o banco e a função da Vaeso conferem): ao mudar o setor
+   da pessoa ou as telas do setor, as abas das pessoas daquele setor são regravadas. Setores em config/setores, nomes em pessoas/<id>.
+   No site, "Enviar convite" chama a função pks-convite: a pessoa recebe um link, abre o site e cria a senha. */
+const GRUPOS_ABAS=()=>MODS.filter(m=>m[0]!=='config').map(([k,l,a])=>[l,a.filter(x=>x[0]!=='-'&&x[0]!=='estmov')]);
+function setoresAtuais(){
+  if(S.setores)return S.setores;
+  const nomes=[...new Set([...SETORES,...S.usuarios.map(x=>x.setor).filter(Boolean)])];
+  return nomes.map(nome=>({nome,abas:[...new Set(S.usuarios.filter(x=>x.setor===nome).flatMap(x=>x.abas||[]))]}));
+}
+const abasDoSetor=nome=>setoresAtuais().find(x=>x.nome===nome)?.abas||[];
 async function renderConfig(){const box=$('v-config');if(!S.acesso.adm){box.innerHTML='';return}
-  const U=S.usuarios;let ps={};try{if(U.length&&S.userCap)ps=await S.userCap.profiles(U.map(x=>x.id))}catch{}
-  const GR=MODS.filter(m=>m[0]!=='config').map(([k,l,a])=>[l,a.filter(x=>x[0]!=='-'&&x[0]!=='estmov')]);
-  let h=`<div class="cfg-add"><label class="campo cresce"><span>Adicionar pessoa</span><input type="search" id="cfgBusca" placeholder="Nome ou e-mail de quem já tem acesso ao link" autocomplete="off"></label><div id="cfgRes" class="cfg-res"></div>
-    <p class="small muted">A pessoa precisa primeiro receber o link pelo botão Compartilhar do Claude. Depois ela aparece nesta busca.</p></div>`;
-  if(!U.length)h+='<div class="empty">Nenhuma pessoa cadastrada ainda.</div>';
-  for(const x of U){const p=ps[x.id]||{};const ab=new Set(x.abas||[]);
-    h+=`<div class="cfg-user"><div class="cfg-top"><div class="cfg-nome"><b>${esc(p.name||'Pessoa sem nome visível')}</b><span class="small muted">${esc(p.email||'')}</span></div>
-      <label class="campo"><span>Setor</span><select data-usetor="${esc(x.id)}"><option value="">Escolher…</option>${SETORES.map(o=>`<option ${x.setor===o?'selected':''}>${esc(o)}</option>`).join('')}</select></label>
-      <button type="button" class="bt cfg-tudo" data-utudo="${esc(x.id)}">Marcar tudo</button><button type="button" class="bt" data-urem="${esc(x.id)}">Remover</button></div>
-      <div class="cfg-abas">${GR.map(([l,a])=>`<fieldset><legend>${esc(l)}</legend>${a.map(([k,n])=>`<label><input type="checkbox" data-uaba="${esc(x.id)}" value="${k}" ${ab.has(k)?'checked':''}> ${esc(n)}</label>`).join('')}</fieldset>`).join('')}</div></div>`}
+  const U=S.usuarios,ST=setoresAtuais(),site=!!window.pksFuncao,ab=S.cfgAba||'usuarios';let ps={};
+  try{if(U.length&&S.userCap)ps=await S.userCap.profiles(U.map(x=>x.id))}catch{}
+  const nomeDe=x=>(S.nomes||{})[x.id]?.nome||'',emailDe=x=>ps[x.id]?.email||(x.id.includes('@')?x.id:''),quantos=n=>U.filter(x=>x.setor===n).length;
+  let h=`<nav class="nfa-tabs cfg-telas" aria-label="Configurações">${[['usuarios','Usuários'],['setores','Setores']].map(([k,l])=>`<button type="button" data-cfgaba="${k}" aria-pressed="${ab===k}">${l}</button>`).join('')}</nav>`;
+  if(ab==='setores'){
+    h+=`<div class="cfg-add cfg-linha"><label class="campo cresce"><span>Novo setor</span><input id="cfgSetorNovo" maxlength="40" placeholder="Nome do setor" autocomplete="off"></label><button type="button" class="bt" data-setornovo>Criar setor</button></div>
+    <p class="small muted">Marque as telas de cada setor. Quem está no setor passa a ver só essas telas. Administrador vê tudo.</p>`;
+    for(const st of ST){const on=new Set(st.abas);
+      h+=`<div class="cfg-user"><div class="cfg-top"><div class="cfg-nome"><b>${esc(st.nome)}</b><span class="small muted">${quantos(st.nome)} pessoa${quantos(st.nome)===1?'':'s'} · ${on.size} tela${on.size===1?'':'s'}</span></div>
+        <button type="button" class="bt" data-setortudo="${esc(st.nome)}">Marcar tudo</button><button type="button" class="bt" data-setorrem="${esc(st.nome)}" ${quantos(st.nome)?'disabled title="Tire as pessoas do setor antes"':''}>Remover</button></div>
+        <div class="cfg-abas">${GRUPOS_ABAS().map(([l,a])=>`<fieldset><legend>${esc(l)}</legend>${a.map(([k,n])=>`<label><input type="checkbox" data-setoraba="${esc(st.nome)}" value="${k}" ${on.has(k)?'checked':''}> ${esc(n)}</label>`).join('')}</fieldset>`).join('')}</div></div>`}
+  }else{
+    const optSet=v=>`<option value="">Sem setor</option>${ST.map(o=>`<option ${v===o.nome?'selected':''}>${esc(o.nome)}</option>`).join('')}`;
+    h+=site?`<div class="cfg-add cfg-linha"><label class="campo"><span>Nome</span><input id="cfgNome" maxlength="60" autocomplete="off"></label><label class="campo cresce"><span>E-mail</span><input id="cfgEmail" type="email" autocomplete="off"></label>
+      <label class="campo"><span>Setor</span><select id="cfgSetor">${optSet('')}</select></label><button type="button" class="bt bt-red" data-uconvida>Adicionar e enviar convite</button></div>
+      <p class="small muted">A pessoa recebe um e-mail com um link, abre o Sistema PKS e cria a própria senha. "Reenviar convite" manda um link novo, também para quem esqueceu a senha.</p>`
+      :`<div class="cfg-add"><label class="campo cresce"><span>Adicionar pessoa</span><input type="search" id="cfgBusca" placeholder="Nome ou e-mail de quem já tem acesso ao link" autocomplete="off"></label><div id="cfgRes" class="cfg-res"></div>
+      <p class="small muted">A pessoa precisa primeiro receber o link pelo botão Compartilhar do Claude. Depois ela aparece nesta busca.</p></div>`;
+    if(!U.length)h+='<div class="empty">Nenhuma pessoa cadastrada ainda.</div>';
+    else h+=`<div class="scroll"><table class="compacto cfg-tab"><thead><tr><th>Nome</th><th>E-mail</th><th>Setor responsável</th><th>Acesso</th><th></th></tr></thead><tbody>${[...U].sort((a,b)=>COLL.compare(nomeDe(a)||emailDe(a),nomeDe(b)||emailDe(b))).map(x=>{const adm=x.admin;
+      return `<tr><td><input class="cfg-in" data-unome="${esc(x.id)}" value="${esc(nomeDe(x))}" placeholder="Nome" maxlength="60" aria-label="Nome de ${esc(emailDe(x))}"></td><td class="small">${esc(emailDe(x)||ps[x.id]?.name||'')}</td>
+        <td><select class="cfg-in" data-usetor="${esc(x.id)}" aria-label="Setor">${optSet(x.setor||'')}</select></td><td>${adm?'<span class="pill p-done">Administrador</span>':`<span class="small muted">${(x.abas||[]).length} tela${(x.abas||[]).length===1?'':'s'}</span>`}</td>
+        <td class="cfg-acoes">${site?`<button type="button" class="bt" data-uconv="${esc(x.id)}">Reenviar convite</button>`:''}${adm?'':`<button type="button" class="bt" data-urem="${esc(x.id)}">Remover</button>`}</td></tr>`}).join('')}</tbody></table></div>`;
+  }
   box.innerHTML=h;desenhaHits()}
 function desenhaHits(){const r=$('cfgRes');if(!r)return;const ja=new Set(S.usuarios.map(x=>x.id));
   r.innerHTML=S.cfgHits.filter(x=>!ja.has(x.id)).slice(0,8).map(x=>`<button type="button" class="cfg-hit" data-uadd="${esc(x.id)}"><b>${esc(x.name)}</b> <span class="small muted">${esc(x.email||'')}</span></button>`).join('')}
-async function salvaUsuario(id,patch){if(!S.db){toast('Sem conexão com a base.');return}const atual={...(S.usuarios.find(x=>x.id===id)||{}),...patch,em:new Date().toISOString()};delete atual.id;
-  try{await S.db.doc('usuarios/'+id).set(atual);toast('Acesso salvo.')}catch{toast('Não foi possível salvar. Só o administrador altera usuários.')}}
+async function salvaUsuario(id,patch,quieto){if(!S.db){toast('Sem conexão com a base.');return false}const atual={...(S.usuarios.find(x=>x.id===id)||{}),...patch,em:new Date().toISOString()};delete atual.id;
+  try{await S.db.doc('usuarios/'+id).set(atual);if(!quieto)toast('Acesso salvo.');return true}catch{toast('Não foi possível salvar. Só o administrador altera usuários.');return false}}
+async function salvaNome(id,nome){if(!S.db)return;nome=String(nome||'').trim().slice(0,60);
+  try{await S.db.doc('pessoas/'+id).set({nome,em:new Date().toISOString()});S.nomes={...(S.nomes||{}),[id]:{nome}};toast('Nome salvo.')}catch{toast('Não foi possível salvar o nome.')}}
+async function salvaSetores(lista,msg){if(!S.db)return;try{await S.db.doc('config/setores').set({lista,em:new Date().toISOString()});S.setores=lista;if(msg)toast(msg)}catch{toast('Não foi possível salvar o setor.')}}
+/* Grava as telas do setor e regrava as abas de quem está nele */
+async function aplicaSetor(nome,abas){const L=setoresAtuais().map(x=>x.nome===nome?{nome,abas}:x);await salvaSetores(L);
+  for(const x of S.usuarios.filter(u=>u.setor===nome&&!u.admin))await salvaUsuario(x.id,{abas},true);toast(`Telas do setor ${nome} salvas.`);renderConfig()}
+async function convida(email,nome){if(!window.pksFuncao)return;
+  try{const r=await window.pksFuncao('pks-convite',{email,nome});toast(r?.tipo==='redefinir'?`${email} já tinha acesso: enviamos um link para criar nova senha.`:`Convite enviado para ${email}.`)}
+  catch(e){toast(e.message||'Não foi possível enviar o convite.')}}
 document.addEventListener('input',async e=>{if(e.target.id!=='cfgBusca'||!S.userCap)return;const q=e.target.value.trim();S.cfgHits=q?await S.userCap.search(q):[];desenhaHits()});
 document.addEventListener('click',async e=>{const t=e.target;
+  const ca=t.closest('[data-cfgaba]');if(ca){S.cfgAba=ca.dataset.cfgaba;renderConfig();return}
   const ad=t.closest('[data-uadd]');if(ad){await salvaUsuario(ad.dataset.uadd,{setor:'',abas:[]});S.cfgHits=[];const b=$('cfgBusca');if(b)b.value='';return}
   const rm=t.closest('[data-urem]');if(rm){if(!confirm('Remover o acesso desta pessoa ao Sistema PKS?'))return;try{await S.db.doc('usuarios/'+rm.dataset.urem).delete();toast('Acesso removido.')}catch{toast('Não foi possível remover.')}return}
-  const tu=t.closest('[data-utudo]');if(tu){await salvaUsuario(tu.dataset.utudo,{abas:ABAS.filter(a=>a!=='config')});return}});
+  if(t.closest('[data-uconvida]')){const email=($('cfgEmail')?.value||'').trim().toLowerCase(),nome=($('cfgNome')?.value||'').trim(),setor=$('cfgSetor')?.value||'';
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast('Digite um e-mail válido.');return}if(!nome){toast('Digite o nome da pessoa.');return}
+    if(S.usuarios.some(x=>x.id===email)){toast('Esse e-mail já está cadastrado. Use Reenviar convite.');return}
+    if(!(await salvaUsuario(email,{setor,abas:setor?abasDoSetor(setor):[]},true)))return;await salvaNome(email,nome);await convida(email,nome);return}
+  const cv=t.closest('[data-uconv]');if(cv){const id=cv.dataset.uconv;if(confirm(`Enviar um novo link de acesso para ${id}?`))await convida(id,(S.nomes||{})[id]?.nome||'');return}
+  if(t.closest('[data-setornovo]')){const n=($('cfgSetorNovo')?.value||'').trim();if(!n){$('cfgSetorNovo')?.focus();return}
+    if(setoresAtuais().some(x=>x.nome.toLowerCase()===n.toLowerCase())){toast('Esse setor já existe.');return}await salvaSetores([...setoresAtuais(),{nome:n,abas:[]}],`Setor ${n} criado.`);renderConfig();return}
+  const sr=t.closest('[data-setorrem]');if(sr){const n=sr.dataset.setorrem;if(!confirm(`Remover o setor ${n}?`))return;await salvaSetores(setoresAtuais().filter(x=>x.nome!==n),'Setor removido.');renderConfig();return}
+  const stu=t.closest('[data-setortudo]');if(stu){await aplicaSetor(stu.dataset.setortudo,ABAS.filter(a=>a!=='config'&&a!=='estmov'));return}});
 document.addEventListener('change',async e=>{const t=e.target;
-  if(t.dataset.usetor){await salvaUsuario(t.dataset.usetor,{setor:t.value});return}
-  if(t.dataset.uaba){const id=t.dataset.uaba;const abas=[...document.querySelectorAll(`[data-uaba="${CSS.escape(id)}"]:checked`)].map(x=>x.value);await salvaUsuario(id,{abas});return}});
+  if(t.dataset.usetor){const st=t.value,x=S.usuarios.find(u=>u.id===t.dataset.usetor);await salvaUsuario(t.dataset.usetor,x?.admin?{setor:st}:{setor:st,abas:st?abasDoSetor(st):[]});return}
+  if(t.dataset.unome){await salvaNome(t.dataset.unome,t.value);return}
+  if(t.dataset.setoraba){const n=t.dataset.setoraba;const abas=[...document.querySelectorAll(`[data-setoraba="${CSS.escape(n)}"]:checked`)].map(x=>x.value);await aplicaSetor(n,abas);return}});
 
 function counts(){const c={em_aberto:0,pronta:0,lancada:0};S.notas.forEach(n=>c[n.status]=(c[n.status]||0)+1);
   $('counts').innerHTML=`<div class="count open"><b>${c.em_aberto}</b><span>Em aberto</span></div><div class="count ready"><b>${c.pronta}</b><span>Prontas para lançar</span></div><div class="count done"><b>${c.lancada}</b><span>Lançadas aqui</span></div><button type="button" class="count period" id="perBtn" aria-expanded="${S.perOpen}" aria-controls="perPanel"><b>${mesAberto()?comp(mesAberto()):'–'}</b><span>Período aberto</span></button>`;return c}
