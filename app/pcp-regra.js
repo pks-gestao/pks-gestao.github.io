@@ -16,8 +16,9 @@ function conferir(modo,valor,pedido){
   if(modo==='mais'&&v<=pedido)return {erro:'A quantidade precisa ser maior que a da ordem.'};
   return {qtd:v,conferencia:modo};
 }
+/* semApontar (27/11/2026, pedido do Chai): linha dada como produzida só na PKS, sem apontamento, sem estoque e sem ir à Vaeso */
 function situacaoLinha(item,marca,ordemAberta){
-  if(!ordemAberta)return 'finalizada';
+  if(!ordemAberta||marca?.semApontar)return 'finalizada';
   const p=item.produzido;if(!p)return 'aberta';
   if(p.conferencia==='igual'||p.conferencia==='mais'||+p.qtd>=pedidoInteiro(item.qtd))return 'finalizada';
   return marca&&marca.encerrada&&+marca.qtd===+p.qtd?'finalizada':'aberta';
@@ -28,12 +29,12 @@ function montar(ops,prods,marcas){
     const itens=(o.itens||[]).map(it=>{const k=o.id+'|'+it.produto_id,env=(prods||{})[k],p=it.produzido||null,marca=(marcas||{})[k];
       return {k,op_id:o.id,produto_id:it.produto_id,oc:vxNumero(o),sku:it.sku||'',desc:it.descricao||'',op:it.op_pks||'',qtd:+it.qtd||0,ent:+it.entregue||0,
         prod:p?+p.qtd||0:null,em:p?.em||'',por:p?.por||'',ordemAberta:aberta,sit:situacaoLinha(it,marca,aberta),
-        marcada:!!(p&&marca&&marca.encerrada&&+marca.qtd===+p.qtd),pendente:env&&env.envio==='pendente'?env:null}});
+        manual:!!marca?.semApontar,marcada:!!(marca?.semApontar||p&&marca&&marca.encerrada&&+marca.qtd===+p.qtd),pendente:env&&env.envio==='pendente'?env:null}});
     const ped=itens.reduce((a,r)=>a+r.qtd,0),feito=itens.reduce((a,r)=>a+(r.prod||0),0);
     return {id:String(o.id),op_id:o.id,numero:vxNumero(o),emitida:o.emitida_em||'',prevista:o.prevista_em||'',status:o.status,itens,ped,feito,
       pct:ped?Math.min(1,feito/ped):0,abertas:itens.filter(r=>r.sit==='aberta'),finalizadas:itens.filter(r=>r.sit==='finalizada'),
       /* todas as linhas prontas, alguma a menos: a Vaeso não encerra sozinha, é preciso encerrar a ordem */
-      encerrar:aberta&&itens.length>0&&itens.every(r=>r.sit==='finalizada'&&!r.pendente)&&itens.some(r=>r.marcada)}});
+      encerrar:aberta&&itens.length>0&&itens.every(r=>r.sit==='finalizada'&&!r.pendente)&&itens.some(r=>r.marcada)&&!itens.some(r=>r.manual)}});
 }
 /* Busca: todas as palavras no número da ordem, no código, na descrição ou na OP de um produto, sem ligar para acento */
 const limpo=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();

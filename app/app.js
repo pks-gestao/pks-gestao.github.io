@@ -251,7 +251,7 @@ function telaPcp(){
 function linhaPcp(r){
   const p=ST.pcp,a=p.ap&&p.ap.k===r.k?p.ap:null,d=r.prod===null?null:r.prod-r.qtd;
   const selo=d===null?'':Math.abs(d)<1?'<i class="ok">igual</i>':d<0?`<i class="falta">−${n0(-d)}</i>`:`<i class="mais">+${n0(d)}</i>`;
-  return `<div class="lin"><div class="lin-t"><span><b>${esc(r.desc||r.sku)}</b><small>${esc(r.sku)}${r.op?' · OP '+esc(r.op):''}${r.ent?' · entregue '+n0(r.ent):''}</small></span><span class="lin-q"><small>pedido</small><b>${n0(r.qtd)}</b></span><span class="lin-q"><small>produzido</small><b>${r.prod===null?'–':n0(r.prod)}</b>${selo}</span></div>
+  return `<div class="lin"><div class="lin-t"><span><b>${esc(r.desc||r.sku)}</b><small>${esc(r.sku)}${r.op?' · OP '+esc(r.op):''}${r.ent?' · entregue '+n0(r.ent):''}${r.manual?' · produzida sem apontamento':''}</small></span><span class="lin-q"><small>pedido</small><b>${n0(r.qtd)}</b></span><span class="lin-q"><small>produzido</small><b>${r.prod===null?'–':n0(r.prod)}</b>${selo}</span></div>
   ${r.pendente?`<p class="aviso erro">${r.pendente.acao==='desfazer'?'Desfazer':'Apontamento de '+n0(r.pendente.qtd)} ainda não recebido pela Vaeso; o sistema tenta de novo a cada 10 minutos.${r.pendente.erro?' '+esc(r.pendente.erro):''}</p>`:''}
   ${a?painelAp(r,a):!r.ordemAberta?'':`<div class="acoes">${r.sit==='aberta'?`<button type="button" class="ac prim" data-ap="${esc(r.k)}" ${p.ocup?'disabled':''}>${r.prod===null?'Apontar':'Alterar apontamento'}</button>`:`${r.marcada?`<button type="button" class="ac" data-reabre="${esc(r.k)}" ${p.ocup?'disabled':''}>Reabrir linha</button>`:`<button type="button" class="ac" data-ap="${esc(r.k)}" ${p.ocup?'disabled':''}>Alterar apontamento</button>`}`}</div>`}</div>`;
 }

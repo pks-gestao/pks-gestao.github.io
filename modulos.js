@@ -834,6 +834,9 @@ function vxOrdens(){
     .sort((a,b)=>a.emitida.localeCompare(b.emitida)||String(a.numero).localeCompare(String(b.numero),'pt-BR',{numeric:true}));
 }
 const vxLinhas=()=>vxOrdens().flatMap(o=>o.itens);
+/* Linha dada como produzida só na PKS (pcp_linhas semApontar, 27/11/2026): sem apontamento, sem estoque e sem ir à Vaeso */
+const vxManual=r=>!!(M.vxLin||{})[r.k]?.semApontar;
+const vxProduzida=o=>o.status==='aberta'&&o.itens.length>0&&o.itens.some(vxManual)&&o.itens.every(r=>vxManual(r)||r.prod&&(r.prod.conferencia==='igual'||r.prod.conferencia==='mais'||+r.prod.qtd>=Math.round(r.qtd)||((M.vxLin||{})[r.k]?.encerrada&&+M.vxLin[r.k].qtd===+r.prod.qtd)));
 /* Produzidos nos últimos 7 dias (pedido do Chai, 25/11/2026, como na Visão PKS do Gestão): por produto e por dia de São Paulo.
    A PKS guarda só a última confirmação de cada item: o total apontado conta no dia dessa confirmação. */
 const diaSP=d=>new Date(d).toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});
@@ -891,9 +894,9 @@ function renderPcpVaeso(){
   const tela=ui('vx_tela','ordens'),navTela=`<nav class="nfa-tabs vx-telas" aria-label="Telas do PCP">${[['ordens','Ordens'],['protheus','Protheus']].map(([k,l])=>`<button data-uiset="vx_tela" data-v="${k}" aria-pressed="${tela===k}">${l}</button>`).join('')}</nav>`;
   if(tela==='protheus'){renderProtheus(box,navTela);return}
   const O=vxOrdens(),q=ui('b_vx',''),aba=ui('vx_aba','abertas'),aberto=ui('vx_open',()=>new Set()),ordAb=ui('vx_ord',()=>new Set()),site=!!window.pksFuncao;
-  const abertas=O.filter(o=>o.status==='aberta'),fin=O.filter(o=>o.status!=='aberta');
+  const abertas=O.filter(o=>o.status==='aberta'&&!vxProduzida(o)),fin=O.filter(o=>o.status!=='aberta'||vxProduzida(o));
   const casaO=o=>casa(`${o.numero} ${o.obs} ${o.itens.map(r=>r.sku+' '+r.desc+' '+r.opPks).join(' ')}`,q);
-  const lista=(aba==='abertas'?abertas:fin).filter(casaO),meta=M.vxMeta||{},itAb=abertas.flatMap(o=>o.itens);
+  const lista=(aba==='abertas'?abertas:fin).filter(casaO),meta=M.vxMeta||{},itAb=abertas.flatMap(o=>o.itens).filter(r=>!vxManual(r));
   const kpi=(t,v,s)=>`<div class="card-k"><span>${t}</span><b>${v}</b>${s?`<small class="muted">${s}</small>`:''}</div>`;
   const quando=meta.ultimoPuxar||meta.em?new Date(meta.ultimoPuxar||meta.em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'–';
   let h=navTela+`<p class="vx-busca">Última busca na Vaeso: ${quando} · a cada 10 minutos${meta.erro?` · <span class="txt-stop">Erro: ${esc(meta.erro)}</span>`:''}</p>${quadroProduzidos()}<div class="cards3">${kpi('Ordens em aberto',n0(abertas.length),n0(itAb.length)+' itens')}${kpi('Itens sem confirmação',n0(itAb.filter(r=>!r.prod).length),'produção ainda não informada')}${kpi('Peças pedidas em aberto',n0(itAb.reduce((a,r)=>a+r.qtd,0)),'')}</div>
@@ -903,16 +906,16 @@ function renderPcpVaeso(){
   if(!lista.length)h+=esperando(O.length?(aba==='abertas'?'Nenhuma ordem em aberto com esse filtro.':'Nenhuma ordem finalizada com esse filtro.'):'Nenhuma ordem recebida da Vaeso ainda.');
   const chip=r=>{if(!r.prod)return '<span class="muted">–</span>';const d=r.prod.qtd-r.qtd;
     return `${n0(r.prod.qtd)} ${Math.abs(d)<1?'<span class="pill p-done">igual</span>':d<0?`<span class="pill p-stop">−${n0(-d)}</span>`:`<span class="pill p-info">+${n0(d)}</span>`}<span class="small muted vx-quem">${dt(String(r.prod.em||'').slice(0,10))} · ${esc(r.prod.por||'')}</span>`};
-  const finLin=r=>r.status==='aberta'&&r.prod&&(r.prod.conferencia==='igual'||r.prod.conferencia==='mais'||+r.prod.qtd>=Math.round(r.qtd)||((M.vxLin||{})[r.k]?.encerrada&&+M.vxLin[r.k].qtd===+r.prod.qtd))?' <span class="pill p-done" title="Linha finalizada">Finalizada</span>':'';
+  const finLin=r=>r.status==='aberta'&&vxManual(r)?' <span class="pill p-done" title="Dada como produzida na PKS, sem apontamento">Produzida</span>':r.status==='aberta'&&r.prod&&(r.prod.conferencia==='igual'||r.prod.conferencia==='mais'||+r.prod.qtd>=Math.round(r.qtd)||((M.vxLin||{})[r.k]?.encerrada&&+M.vxLin[r.k].qtd===+r.prod.qtd))?' <span class="pill p-done" title="Linha finalizada">Finalizada</span>':'';
   const envio=r=>!r.env||r.env.acao==='desfazer'&&r.env.envio==='enviado'?'':r.env.envio==='enviado'?'<span class="small vx-ok" title="Recebido pela Vaeso">✓ enviado</span>':`<span class="small txt-stop" title="${esc(r.env.erro||'')}">a enviar</span>`;
-  const stPill=o=>o.status==='aberta'?(o.feito>0?'<span class="pill p-ready">Parcial</span>':'<span class="pill p-open">Em aberto</span>'):o.status==='cancelada'?'<span class="pill p-stop">Cancelada</span>':'<span class="pill p-done">Concluída</span>';
+  const stPill=o=>vxProduzida(o)?'<span class="pill p-done">Produzida</span>':o.status==='aberta'?(o.feito>0?'<span class="pill p-ready">Parcial</span>':'<span class="pill p-open">Em aberto</span>'):o.status==='cancelada'?'<span class="pill p-stop">Cancelada</span>':'<span class="pill p-done">Concluída</span>';
   for(const o of lista){const oa=ordAb.has(String(o.id));
     h+=`<section class="vx-ordem${oa?' aberta':''}"><header class="vx-cab" data-vxord="${esc(o.id)}" role="button" tabindex="0" aria-expanded="${oa}"><span class="seta" aria-hidden="true">${oa?'▾':'›'}</span><div class="vx-tit"><b>${esc(o.numero)}</b> ${stPill(o)}<span class="small muted">Emissão ${dt(o.emitida)}${o.prevista?' · prevista '+dt(o.prevista):''}${o.obs?' · '+esc(o.obs):''}</span></div>
       <div class="vx-prog" title="${num(o.pct,0)}% confirmado como produzido"><span class="small"><b>${n0(o.feito)}</b> de ${n0(o.ped)} pç</span><span class="pcp-bar"><i style="width:${o.pct}%"></i></span></div>
-      ${site&&o.status==='aberta'?`<button type="button" class="bt vx-bt" data-vxenc="${esc(o.id)}" ${M.vxOcupado?'disabled':''}>Encerrar</button>`:''}</header>
+      ${site&&o.status==='aberta'&&!vxProduzida(o)?`<button type="button" class="bt vx-bt" data-vxenc="${esc(o.id)}" ${M.vxOcupado?'disabled':''}>Encerrar</button>`:''}</header>
       ${!oa?'':`<div class="scroll"><table class="compacto fit vx-itens"><thead><tr><th>OP PKS</th><th>SKU</th><th>Descrição</th><th class="num">Pedido</th><th class="num">Entregue</th><th>Produzido PKS</th><th></th></tr></thead><tbody>${o.itens.map(r=>
       `<tr><td class="mono">${r.opPks?esc(r.opPks):'<span class="muted">–</span>'}</td><td class="mono">${esc(r.sku)}</td><td class="trunca"><span title="${esc(r.desc)}">${esc(r.desc)}</span></td><td class="num">${num(r.qtd,2)}</td><td class="num">${num(r.entregue,2)}</td><td>${chip(r)}${finLin(r)} ${envio(r)}</td>
-       <td>${site&&o.status==='aberta'?`<button type="button" class="bt vx-bt" data-vxopen="${esc(r.k)}" aria-expanded="${aberto.has(r.k)}">${r.prod?'Alterar':'Produzido'}</button>`:''}</td></tr>${aberto.has(r.k)&&site&&o.status==='aberta'?vxPainel(r):''}`).join('')}</tbody></table></div>`}</section>`;
+       <td>${site&&o.status==='aberta'&&!vxManual(r)?`<button type="button" class="bt vx-bt" data-vxopen="${esc(r.k)}" aria-expanded="${aberto.has(r.k)}">${r.prod?'Alterar':'Produzido'}</button>`:''}</td></tr>${aberto.has(r.k)&&site&&o.status==='aberta'?vxPainel(r):''}`).join('')}</tbody></table></div>`}</section>`;
   }
   box.innerHTML=h;
   const inp=document.getElementById('vxQtd');if(inp&&M.vxFoco){inp.focus();M.vxFoco=false}
