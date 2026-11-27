@@ -6,6 +6,12 @@
   /* Tudo do PKS fica no esquema pks do projeto, separado do que já existe nele. */
   /* Link do convite ou do "Esqueci a senha" (26/11/2026): chega com #...type=invite|recovery; depois de entrar, pede a senha */
   const tipoLink=(/[#&]type=(invite|recovery)/.exec(location.hash)||[])[1]||'';
+  /* Link gerado em Configurações › Usuários (27/11/2026): ?acesso=<chave>&tipo=invite|recovery. Abrir a página não gasta o link
+     (a pré-visualização do WhatsApp e o antivírus do e-mail abrem sozinhos); a chave só é usada quando a pessoa cria a senha. */
+  const qsLink=new URLSearchParams(location.search),acesso=qsLink.get('acesso')||'',tipoAcesso=qsLink.get('tipo')==='recovery'?'recovery':'invite';
+  const linkVencido=/error_code=(otp_expired|access_denied)|error=access_denied/.test(location.hash);
+  const limpaUrl=()=>history.replaceState(null,'',location.pathname);
+  const MSG_VENCIDO='Este link já foi usado ou venceu. Peça um novo link ao administrador.';
   const sb=window.supabase.createClient(C.url,C.anonKey,{db:{schema:'pks'}});
   let sessao=null,perfil=null;
 
@@ -25,6 +31,7 @@
       <button type="submit">Entrar</button><div class="msg" role="status"></div>
       <button type="button" class="lk" data-a="criar">Primeiro acesso: criar senha</button><button type="button" class="lk" data-a="esqueci">Esqueci a senha</button></form>`;
     document.body.appendChild(w);const f=w.querySelector('form'),msg=w.querySelector('.msg');
+    if(linkVencido){msg.textContent=MSG_VENCIDO;limpaUrl()}
     const dados=()=>({email:f.e.value.trim().toLowerCase(),password:f.s.value});
     f.addEventListener('submit',async e=>{e.preventDefault();msg.textContent='Entrando…';
       const {data,error}=await sb.auth.signInWithPassword(dados());
@@ -37,22 +44,29 @@
         msg.textContent=error?'Não foi possível criar o acesso.':'Enviamos um link para o seu e-mail. Confirme e depois entre.'}
       if(a==='esqueci'){await sb.auth.resetPasswordForEmail(d.email,{redirectTo:location.origin+location.pathname});msg.textContent='Se o e-mail estiver cadastrado, enviamos o link para trocar a senha.'}});
   })}
-  function telaSenha(nome,convite){return new Promise(ok=>{
+  function telaSenha(nome,convite,otp){return new Promise(ok=>{
     const st=document.createElement('style');st.textContent=estilo;document.head.appendChild(st);
     const w=document.createElement('div');w.id='pksLogin';
     w.innerHTML=`<form><h1>${convite?'Bem-vindo'+(nome?', '+nome.replace(/[<>&"]/g,''):'')+'!':'Nova senha'}</h1><p style="margin:0;font-size:14px;color:#6e6d6a">${convite?'Crie a senha que você vai usar para entrar no Sistema PKS.':'Digite a nova senha do Sistema PKS.'}</p>
       <label>Senha<input type="password" name="s" required minlength="8" autocomplete="new-password"></label><label>Repita a senha<input type="password" name="r" required minlength="8" autocomplete="new-password"></label>
-      <button type="submit">${convite?'Criar senha e entrar':'Salvar senha'}</button><div class="msg" role="status"></div></form>`;
+      <button type="submit">${convite?'Criar senha e entrar':'Salvar senha'}</button><div class="msg" role="status"></div>${otp?'<button type="button" class="lk" data-a="entrada">Já tenho senha: ir para a entrada</button>':''}</form>`;
     document.body.appendChild(w);const f=w.querySelector('form'),msg=w.querySelector('.msg');f.s.focus();
     f.addEventListener('submit',async e=>{e.preventDefault();
       if(f.s.value.length<8){msg.textContent='Use pelo menos 8 caracteres.';return}if(f.s.value!==f.r.value){msg.textContent='As duas senhas não são iguais.';return}
-      msg.textContent='Salvando…';const {error}=await sb.auth.updateUser({password:f.s.value});
+      msg.textContent='Salvando…';
+      if(otp&&!otp.feito){const v=await sb.auth.verifyOtp({token_hash:otp.chave,type:otp.tipo});
+        if(v.error||!v.data?.session){msg.textContent=MSG_VENCIDO;return}otp.feito=true;limpaUrl()}
+      const {error}=await sb.auth.updateUser({password:f.s.value});
       if(error){msg.textContent=/different|same/i.test(error.message)?'Escolha uma senha diferente da anterior.':'Não foi possível salvar. Peça um novo link ao administrador.';return}
-      w.remove();ok()})})}
+      w.remove();ok(true)});
+    w.addEventListener('click',e=>{if(e.target.dataset.a==='entrada'){limpaUrl();w.remove();ok(false)}})})}
 
   const pronto=(async()=>{
     if(document.readyState==='loading')await new Promise(r=>document.addEventListener('DOMContentLoaded',r,{once:true}));
-    const {data}=await sb.auth.getSession();sessao=data.session||await telaLogin();
+    if(acesso){await sb.auth.signOut({scope:'local'}).catch(()=>null);
+      const r=await telaSenha('',tipoAcesso==='invite',{chave:acesso,tipo:tipoAcesso});
+      if(r){const s=await sb.auth.getSession();sessao=s.data.session}}
+    const {data}=await sb.auth.getSession();sessao=sessao||data.session||await telaLogin();
     if(tipoLink&&data.session){history.replaceState(null,'',location.pathname+location.search);await telaSenha(sessao.user.user_metadata?.nome||'',tipoLink==='invite')}
     const email=sessao.user.email.toLowerCase();
     const r=await sb.from('usuarios').select('*').eq('email',email).maybeSingle();perfil=r.data||null;
