@@ -645,7 +645,7 @@ td.fpv-semc{color:var(--muted);font-size:11.5px}
 .cfg-abas{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
 .cfg-abas fieldset{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:0;display:grid;gap:4px}
 .cfg-abas legend{font:600 11px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 4px}
-.cfg-telas{width:max-content;margin-bottom:12px}.cfg-linha{display:flex;flex-wrap:wrap;align-items:end;gap:10px}.cfg-tab td{vertical-align:middle}.cfg-in{font:13px var(--body);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);min-width:150px}.cfg-acoes{white-space:nowrap;text-align:right}.cfg-acoes .bt{padding:6px 10px;font-size:12.5px;margin-left:6px}
+.cfg-telas{width:max-content;margin-bottom:12px}.cfg-link{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:16px}.cfg-link-c{background:var(--panel);border-radius:14px;padding:18px;width:min(560px,100%);display:grid;gap:10px}.cfg-link-c .cfg-in{width:100%;font-family:var(--mono);font-size:12px}.cfg-linha{display:flex;flex-wrap:wrap;align-items:end;gap:10px}.cfg-tab td{vertical-align:middle}.cfg-in{font:13px var(--body);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);min-width:150px}.cfg-acoes{white-space:nowrap;text-align:right}.cfg-acoes .bt{padding:6px 10px;font-size:12.5px;margin-left:6px}
 .cfg-abas label{font-size:13px;display:flex;gap:6px;align-items:center}.cfg-abas input{accent-color:var(--firebrick)}
 /* ===== Layout 2026: lateral grafite e vermelho PKS, tema claro e escuro à escolha do usuário ===== */
 :root,:root[data-theme="light"]{--red:#d71f26;--red-ink:#c11a21;--red-bg:#fdecec;--brand:#d71f26;
@@ -989,7 +989,7 @@ async function renderConfig(){const box=$('v-config');if(!S.acesso.adm){box.inne
     else h+=`<div class="scroll"><table class="compacto cfg-tab"><thead><tr><th>Nome</th><th>E-mail</th><th>Setor responsável</th><th>Acesso</th><th></th></tr></thead><tbody>${[...U].sort((a,b)=>COLL.compare(nomeDe(a)||emailDe(a),nomeDe(b)||emailDe(b))).map(x=>{const adm=x.admin;
       return `<tr><td><input class="cfg-in" data-unome="${esc(x.id)}" value="${esc(nomeDe(x))}" placeholder="Nome" maxlength="60" aria-label="Nome de ${esc(emailDe(x))}"></td><td class="small">${esc(emailDe(x)||ps[x.id]?.name||'')}</td>
         <td><select class="cfg-in" data-usetor="${esc(x.id)}" aria-label="Setor">${optSet(x.setor||'')}</select></td><td>${adm?'<span class="pill p-done">Administrador</span>':`<span class="small muted">${(x.abas||[]).length} tela${(x.abas||[]).length===1?'':'s'}</span>`}</td>
-        <td class="cfg-acoes">${site?`<button type="button" class="bt" data-uconv="${esc(x.id)}">Reenviar convite</button>`:''}${adm?'':`<button type="button" class="bt" data-urem="${esc(x.id)}">Remover</button>`}</td></tr>`}).join('')}</tbody></table></div>`;
+        <td class="cfg-acoes">${site?`<button type="button" class="bt" data-ulink="${esc(x.id)}">Gerar link</button><button type="button" class="bt" data-uconv="${esc(x.id)}">Reenviar convite</button>`:''}${adm?'':`<button type="button" class="bt" data-urem="${esc(x.id)}">Remover</button>`}</td></tr>`}).join('')}</tbody></table></div>`;
   }
   box.innerHTML=h;desenhaHits()}
 function desenhaHits(){const r=$('cfgRes');if(!r)return;const ja=new Set(S.usuarios.map(x=>x.id));
@@ -1002,6 +1002,11 @@ async function salvaSetores(lista,msg){if(!S.db)return;try{await S.db.doc('confi
 /* Grava as telas do setor e regrava as abas de quem está nele */
 async function aplicaSetor(nome,abas){const L=setoresAtuais().map(x=>x.nome===nome?{nome,abas}:x);await salvaSetores(L);
   for(const x of S.usuarios.filter(u=>u.setor===nome&&!u.admin))await salvaUsuario(x.id,{abas},true);toast(`Telas do setor ${nome} salvas.`);renderConfig()}
+/* Link de acesso para o administrador enviar (27/11/2026): abre o site pedindo a senha; vale por pouco tempo e uma vez só */
+function mostraLink(email,link,tipo){$('cfgLink')?.remove();const d=document.createElement('div');d.id='cfgLink';d.className='cfg-link';d.setAttribute('role','dialog');d.setAttribute('aria-label','Link de acesso');
+  d.innerHTML=`<div class="cfg-link-c"><b>Link de acesso de ${esc(email)}</b><p class="small muted">${tipo==='redefinir'?'Essa pessoa já tem cadastro: o link abre o sistema para criar uma senha nova.':'O link abre o sistema para a pessoa criar a senha dela.'} Envie só para ela (WhatsApp ou e-mail). Ele funciona uma vez e expira em pouco tempo; se vencer, gere outro.</p>
+  <input id="cfgLinkTxt" class="cfg-in" readonly value="${esc(link)}"><div class="tools"><button type="button" class="bt bt-red" data-linkcopia>Copiar link</button><button type="button" class="bt" data-linkfecha>Fechar</button></div></div>`;
+  document.body.appendChild(d);$('cfgLinkTxt').select()}
 async function convida(email,nome){if(!window.pksFuncao)return;
   try{const r=await window.pksFuncao('pks-convite',{email,nome});toast(r?.tipo==='redefinir'?`${email} já tinha acesso: enviamos um link para criar nova senha.`:`Convite enviado para ${email}.`)}
   catch(e){toast(e.message||'Não foi possível enviar o convite.')}}
@@ -1014,6 +1019,11 @@ document.addEventListener('click',async e=>{const t=e.target;
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast('Digite um e-mail válido.');return}if(!nome){toast('Digite o nome da pessoa.');return}
     if(S.usuarios.some(x=>x.id===email)){toast('Esse e-mail já está cadastrado. Use Reenviar convite.');return}
     if(!(await salvaUsuario(email,{setor,abas:setor?abasDoSetor(setor):[]},true)))return;await salvaNome(email,nome);await convida(email,nome);return}
+  const ul=t.closest('[data-ulink]');if(ul){const id=ul.dataset.ulink;ul.disabled=true;
+    try{const r=await window.pksFuncao('pks-convite',{email:id,nome:(S.nomes||{})[id]?.nome||'',acao:'link'});if(!r?.link)throw new Error('O link não veio.');mostraLink(id,r.link,r.tipo)}
+    catch(er){toast(er.message||'Não foi possível gerar o link.')}ul.disabled=false;return}
+  if(t.closest('[data-linkcopia]')){const i=$('cfgLinkTxt');try{await navigator.clipboard.writeText(i.value);toast('Link copiado. Envie para a pessoa.')}catch{i.select();toast('Selecione e copie o link.')}return}
+  if(t.closest('[data-linkfecha]')){$('cfgLink')?.remove();return}
   const cv=t.closest('[data-uconv]');if(cv){const id=cv.dataset.uconv;if(confirm(`Enviar um novo link de acesso para ${id}?`))await convida(id,(S.nomes||{})[id]?.nome||'');return}
   if(t.closest('[data-setornovo]')){const n=($('cfgSetorNovo')?.value||'').trim();if(!n){$('cfgSetorNovo')?.focus();return}
     if(setoresAtuais().some(x=>x.nome.toLowerCase()===n.toLowerCase())){toast('Esse setor já existe.');return}await salvaSetores([...setoresAtuais(),{nome:n,abas:[]}],`Setor ${n} criado.`);renderConfig();return}
